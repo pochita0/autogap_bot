@@ -8,7 +8,7 @@ import { Opportunity } from '../types/opportunity';
 import { FxRateService } from './FxRateService';
 
 export class KimchiGapCalculator {
-  constructor(private fxRateService: FxRateService) {}
+  constructor(private fxRateService: FxRateService) { }
 
   /**
    * Calculate FX-normalized gap for a Kimchi Premium opportunity
@@ -38,8 +38,8 @@ export class KimchiGapCalculator {
       throw new Error('Sell price is required for Kimchi Premium gap calculation');
     }
 
-    let buyPriceUsdt: number;
-    let sellPriceUsdt: number;
+    let buyPriceUsdt: number | undefined;
+    let sellPriceUsdt: number | undefined;
 
     if (type === 'KIMP_OVERSEAS_TO_BITHUMB') {
       // Buy overseas in USDT, sell on Bithumb in KRW
@@ -49,6 +49,10 @@ export class KimchiGapCalculator {
       // Buy on Bithumb in KRW, sell overseas in USDT
       buyPriceUsdt = buyPrice / fxRate; // Convert KRW to USDT
       sellPriceUsdt = sellPrice; // Already in USDT
+    }
+
+    if (sellPriceUsdt === undefined || buyPriceUsdt === undefined || buyPriceUsdt === 0) {
+      throw new Error("Missing buy/sell price for gap calculation");
     }
 
     // Calculate gap percentage

@@ -60,4 +60,6 @@ export interface PremiumOpportunitiesResponse {
   fxRate: number;
   fxRateTimestamp: string;
   data: PremiumOpportunity[];
+  error?: string;
+  message?: string;
 }

@@ -82,6 +82,8 @@ interface OpportunitiesResponse {
   dataset: 'dummy' | 'golden';
   count: number;
   data: Opportunity[];
+  error?: string;
+  message?: string;
 }
 
 // GET /health - Health check endpoint
@@ -108,7 +110,7 @@ server.get<{
     return reply.status(400).send({
       error: 'Invalid dataset parameter',
       message: 'dataset must be "dummy" or "golden"',
-    });
+    } as any);
   }
 
   // Select appropriate dataset
@@ -151,7 +153,7 @@ server.get<{
     return reply.status(400).send({
       error: 'Missing required parameters',
       message: 'Both exchange and symbol are required',
-    });
+    } as any);
   }
 
   // Check cache first
@@ -185,7 +187,7 @@ server.get<{
     return reply.status(400).send({
       error: 'Missing required parameters',
       message: 'exchangeA, exchangeB, and symbol are required',
-    });
+    } as any);
   }
 
   // Check cache first
@@ -370,7 +372,7 @@ server.get<{
       return reply.status(404).send({
         error: 'Symbol not found',
         message: `No quotes found for symbol ${symbol}`,
-      });
+      } as any);
     }
 
     krwQuotes = [krwQuote];

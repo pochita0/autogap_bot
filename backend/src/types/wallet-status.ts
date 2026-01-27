@@ -57,6 +57,9 @@ export interface WalletStatus {
 
   /** Count of networks with both deposit and withdraw enabled */
   openNetworksCount: number;
+
+  error?: string;
+  message?: string;
 }
 
 /**
@@ -103,6 +106,9 @@ export interface CommonNetworksResponse {
 
   /** When this data was last updated */
   updatedAt: string;
+
+  error?: string;
+  message?: string;
 }
 
 /**
