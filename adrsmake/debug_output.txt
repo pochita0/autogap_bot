@@ -1,0 +1,323 @@
+Fetching 0G and 1INCH Info...
+
+--- Checking 0G ---
+Trying to fetch address for 0G on BNB Smart Chain ...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "0G",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517606716
+}
+
+--- Checking 1INCH ---
+Trying to fetch address for 1INCH on Ethereum...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "1INCH",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517607065
+}
+
+--- Checking USDT ---
+Trying to fetch address for USDT on Aptos...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517607500
+}
+Trying to fetch address for USDT on Arbitrum One...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517607634
+}
+Trying to fetch address for USDT on Berachain...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517607772
+}
+Trying to fetch address for USDT on BNB Smart Chain...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517607944
+}
+Trying to fetch address for USDT on CAVAX...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "AVAXC",
+        "addressDeposit": "0x8e1703b42c662cdf8460af3735351ab2a3711e67",
+        "tagDeposit": "",
+        "chain": "CAVAX",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "F4A8c7"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517608124
+}
+Trying to fetch address for USDT on CELO...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "CELO",
+        "addressDeposit": "0x8e1703b42c662cdf8460af3735351ab2a3711e67",
+        "tagDeposit": "",
+        "chain": "CELO",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "483D5e"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517608336
+}
+Trying to fetch address for USDT on CORN...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "CORN (USDT0)",
+        "addressDeposit": "0x8e1703b42c662cdf8460af3735351ab2a3711e67",
+        "tagDeposit": "",
+        "chain": "CORN",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "625ebb"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517608542
+}
+Trying to fetch address for USDT on Ethereum...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517608666
+}
+Trying to fetch address for USDT on HyperEVM...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517608796
+}
+Trying to fetch address for USDT on KAVAEVM...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "KAVAEVM",
+        "addressDeposit": "0x8e1703b42c662cdf8460af3735351ab2a3711e67",
+        "tagDeposit": "",
+        "chain": "KAVAEVM",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "69109c"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517608972
+}
+Trying to fetch address for USDT on KAIA...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609108
+}
+Trying to fetch address for USDT on Mantle Network(USDT0)...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609238
+}
+Trying to fetch address for USDT on Mantle Network(Bridged)...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609375
+}
+Trying to fetch address for USDT on Polygon PoS...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609505
+}
+Trying to fetch address for USDT on Monad...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609632
+}
+Trying to fetch address for USDT on OP Mainnet...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609797
+}
+Trying to fetch address for USDT on Plasma...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517609932
+}
+Trying to fetch address for USDT on SOL...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "SOL",
+        "addressDeposit": "H9J4iqxRZZeDAzux33GdZqk3frX5tcGCZdGoU5tVLCzx",
+        "tagDeposit": "",
+        "chain": "SOL",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "enwNYB"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517610124
+}
+Trying to fetch address for USDT on TON...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "TON",
+        "addressDeposit": "UQBNyDB5zyARo7ozJsXgwCB6xaMxlxoYqZO67QeYcdv4CVTZ",
+        "tagDeposit": "",
+        "chain": "TON",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "Id_sDs"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517610328
+}
+Trying to fetch address for USDT on TRX...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": [
+      {
+        "chainType": "TRON (TRC20)",
+        "addressDeposit": "TLRPtPM7UYp8MszAiUh4sSRbuMVRdnkxN8",
+        "tagDeposit": "",
+        "chain": "TRX",
+        "batchReleaseLimit": "-1",
+        "contractAddress": "gjLj6t"
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1769517610519
+}
+Trying to fetch address for USDT on zkSync Lite...
+Response: {
+  "retCode": 0,
+  "retMsg": "success",
+  "result": {
+    "coin": "USDT",
+    "chains": []
+  },
+  "retExtInfo": {},
+  "time": 1769517610655
+}

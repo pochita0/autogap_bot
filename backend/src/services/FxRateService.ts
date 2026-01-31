@@ -1,175 +1,114 @@
 /**
  * FX Rate Service
- *
- * Provides USDT/KRW exchange rate for Kimchi Premium gap calculations.
- * Structured to support both mock (MVP) and live API implementations.
+ * Fetches and caches USDT/KRW rate from Bithumb with conservative bid/ask spreads
  */
 
-import { CacheService } from './CacheService';
+import { BithumbQuoteConnector } from '../connectors/BithumbQuoteConnector';
 
-/**
- * FX Rate source interface
- */
+export interface FxRate {
+  source: string;
+  bid: number; // Conservative rate for converting USDT bid to KRW
+  ask: number; // Conservative rate for converting USDT ask to KRW
+  mid: number; // Midpoint for display
+  timestamp: string;
+  stale: boolean;
+}
+
 export interface FxRateSource {
-  /**
-   * Get current USDT/KRW exchange rate
-   * @returns Promise resolving to the exchange rate (e.g., 1350.5 means 1 USDT = 1350.5 KRW)
-   */
-  fetchUsdtKrwRate(): Promise<number>;
-
-  /**
-   * Get the name/identifier of this rate source
-   */
-  getSourceName(): string;
+  getRate(): Promise<FxRate>;
 }
 
 /**
- * FX Rate response
+ * Live FX Rate Source using Bithumb USDT/KRW
  */
-export interface FxRateResponse {
-  rate: number; // USDT/KRW rate
-  source: string; // Source identifier
-  timestamp: string; // ISO timestamp when rate was fetched
-}
+export class BithumbFxRateSource implements FxRateSource {
+  private connector: BithumbQuoteConnector;
+  private cache: FxRate | null = null;
+  private cacheExpiry: number = 0;
+  private fallbackCacheExpiry: number = 0;
 
-/**
- * Mock FX Rate Source (for MVP)
- * Uses a realistic fixed rate that can be updated periodically
- */
-export class MockFxRateSource implements FxRateSource {
-  private baseRate = 1462; // Base rate: 1 USDT = 1462 KRW (updated to match real market Jan 2026)
-  private variance = 5; // Random variance of ±5 KRW
+  // TTL for live cache (1-3 seconds for fresh data)
+  private readonly LIVE_TTL_MS = 2000; // 2 seconds
 
-  async fetchUsdtKrwRate(): Promise<number> {
-    // Simulate slight market fluctuations
-    const fluctuation = (Math.random() - 0.5) * this.variance * 2;
-    return this.baseRate + fluctuation;
+  // TTL for fallback cache (60 seconds for resilience if API fails)
+  private readonly FALLBACK_TTL_MS = 60000; // 60 seconds
+
+  constructor(connector?: BithumbQuoteConnector) {
+    this.connector = connector || new BithumbQuoteConnector();
   }
 
-  getSourceName(): string {
-    return 'Mock (Upbit USDT/KRW simulated)';
-  }
-}
+  async getRate(): Promise<FxRate> {
+    const now = Date.now();
 
-/**
- * Live FX Rate Source (placeholder for future implementation)
- * Can fetch from Upbit or Bithumb USDT/KRW market
- */
-export class LiveFxRateSource implements FxRateSource {
-  constructor(
-    private apiUrl: string = 'https://api.upbit.com/v1/ticker?markets=KRW-USDT'
-  ) {}
-
-  async fetchUsdtKrwRate(): Promise<number> {
-    try {
-      const response = await fetch(this.apiUrl);
-      const data = await response.json();
-
-      // Upbit API returns trade_price for KRW-USDT market
-      if (Array.isArray(data) && data.length > 0 && data[0].trade_price) {
-        return data[0].trade_price;
-      }
-
-      throw new Error('Invalid response from Upbit API');
-    } catch (error) {
-      console.error('Failed to fetch live FX rate, falling back to mock:', error);
-      // Fallback to mock rate
-      return 1350;
+    // Check live cache first
+    if (this.cache && now < this.cacheExpiry) {
+      return { ...this.cache, stale: false };
     }
-  }
 
-  getSourceName(): string {
-    return 'Upbit USDT/KRW';
+    // Try to fetch fresh rate
+    try {
+      const quote = await this.connector.fetchQuote('USDT');
+
+      if (quote && quote.bid > 0 && quote.ask > 0) {
+        const rate: FxRate = {
+          source: 'BITHUMB',
+          bid: quote.bid,
+          ask: quote.ask,
+          mid: (quote.bid + quote.ask) / 2,
+          timestamp: quote.timestamp,
+          stale: false,
+        };
+
+        // Update both caches
+        this.cache = rate;
+        this.cacheExpiry = now + this.LIVE_TTL_MS;
+        this.fallbackCacheExpiry = now + this.FALLBACK_TTL_MS;
+
+        return rate;
+      }
+    } catch (error) {
+      console.error('Failed to fetch FX rate from Bithumb:', error);
+    }
+
+    // If fresh fetch failed, use fallback cache if available
+    if (this.cache && now < this.fallbackCacheExpiry) {
+      console.warn('Using stale FX rate from fallback cache');
+      return { ...this.cache, stale: true };
+    }
+
+    // No cache available, throw error
+    throw new Error('Failed to fetch FX rate and no cached data available');
   }
 }
 
 /**
  * FX Rate Service
- * Main service for fetching and caching FX rates
+ * Provides access to USDT/KRW exchange rate
  */
 export class FxRateService {
-  private cache: CacheService;
-  private cacheKey = 'fx:usdt-krw';
+  private source: FxRateSource;
 
-  constructor(
-    private source: FxRateSource,
-    cacheTtlSeconds: number = 20 // Default 20s TTL
-  ) {
-    this.cache = new CacheService(cacheTtlSeconds * 1000);
+  constructor(source?: FxRateSource) {
+    this.source = source || new BithumbFxRateSource();
   }
 
   /**
-   * Get current USDT/KRW exchange rate (cached)
-   * @returns Current exchange rate (e.g., 1350.5)
+   * Get current USDT/KRW exchange rate
    */
-  async getUsdtKrwRate(): Promise<number> {
-    // Check cache first
-    const cached = this.cache.get<number>(this.cacheKey);
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    // Fetch from source
-    const rate = await this.source.fetchUsdtKrwRate();
-
-    // Cache the rate
-    this.cache.set(this.cacheKey, rate);
-
-    return rate;
+  async getUsdtKrwRate(): Promise<FxRate> {
+    return this.source.getRate();
   }
 
   /**
-   * Get FX rate with metadata
-   * @returns FX rate response with source and timestamp
+   * Convert USDT to KRW using conservative rates
+   * Use bid rate for converting USDT bid (lower, conservative for selling)
+   * Use ask rate for converting USDT ask (higher, conservative for buying)
    */
-  async getUsdtKrwRateWithMetadata(): Promise<FxRateResponse> {
+  async convertUsdtToKrw(amountUsdt: number, side: 'bid' | 'ask'): Promise<number> {
     const rate = await this.getUsdtKrwRate();
-
-    return {
-      rate,
-      source: this.source.getSourceName(),
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  /**
-   * Convert KRW to USDT
-   * @param krwAmount Amount in KRW
-   * @returns Equivalent amount in USDT
-   */
-  async convertKrwToUsdt(krwAmount: number): Promise<number> {
-    const rate = await this.getUsdtKrwRate();
-    return krwAmount / rate;
-  }
-
-  /**
-   * Convert USDT to KRW
-   * @param usdtAmount Amount in USDT
-   * @returns Equivalent amount in KRW
-   */
-  async convertUsdtToKrw(usdtAmount: number): Promise<number> {
-    const rate = await this.getUsdtKrwRate();
-    return usdtAmount * rate;
-  }
-
-  /**
-   * Force refresh the cached rate
-   */
-  async refreshRate(): Promise<number> {
-    this.cache.delete(this.cacheKey);
-    return await this.getUsdtKrwRate();
-  }
-
-  /**
-   * Get cache statistics
-   */
-  getCacheStats() {
-    return this.cache.getStats();
+    return side === 'bid' ? amountUsdt * rate.bid : amountUsdt * rate.ask;
   }
 }
 
-// Export global singleton instance (using Mock for MVP)
-export const fxRateService = new FxRateService(new MockFxRateSource(), 20);
-
-// Alternative: To use live rate source, uncomment:
-// export const fxRateService = new FxRateService(new LiveFxRateSource(), 20);
+// Export global singleton instance using Bithumb live source
+export const fxRateService = new FxRateService(new BithumbFxRateSource());

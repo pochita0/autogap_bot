@@ -167,15 +167,49 @@ export default function PremiumDetailsModal({ opportunity, onClose }: PremiumDet
               <div>
                 <div className="text-xs text-slate-400 mb-1">Gap %</div>
                 <div className={`text-xl font-bold ${
-                  opportunity.gapPct >= 1 ? 'text-green-400' : 'text-yellow-300'
+                  Math.abs(opportunity.gapPct) >= 2
+                    ? opportunity.gapPct >= 0 ? 'text-green-400' : 'text-red-400'
+                    : Math.abs(opportunity.gapPct) >= 1
+                      ? opportunity.gapPct >= 0 ? 'text-green-300' : 'text-red-300'
+                      : opportunity.gapPct >= 0 ? 'text-yellow-300' : 'text-orange-300'
                 }`}>
-                  {opportunity.gapPct.toFixed(2)}%
+                  {(opportunity.gapPct >= 0 ? '+' : '')}{opportunity.gapPct.toFixed(2)}%
                 </div>
               </div>
-              <div>
-                <div className="text-xs text-slate-400 mb-1">FX Rate</div>
+              <div className="relative group">
+                <div className="text-xs text-slate-400 mb-1">
+                  FX Rate {opportunity.fxStale && <span className="text-amber-400">(stale)</span>}
+                </div>
                 <div className="text-lg font-semibold text-white">
-                  {opportunity.usdtKrw.toFixed(2)} KRW/USDT
+                  {opportunity.fxRateMid.toFixed(2)} KRW/USDT
+                </div>
+                <div className="text-xs text-slate-500">
+                  {opportunity.fxSource}
+                </div>
+                {/* Tooltip with bid/ask details */}
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-700 rounded-lg shadow-xl p-3 text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <div className="font-semibold text-white mb-2">FX Rate Details</div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Bid (sell USDT):</span>
+                      <span className="text-white">{opportunity.fxRateBid.toFixed(2)} KRW</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Mid (display):</span>
+                      <span className="text-white">{opportunity.fxRateMid.toFixed(2)} KRW</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Ask (buy USDT):</span>
+                      <span className="text-white">{opportunity.fxRateAsk.toFixed(2)} KRW</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-600 pt-1 mt-1">
+                      <span>Spread:</span>
+                      <span className="text-blue-300">{((opportunity.fxRateAsk - opportunity.fxRateBid) / opportunity.fxRateBid * 100).toFixed(3)}%</span>
+                    </div>
+                  </div>
+                  <div className="text-slate-400 mt-2 text-[10px]">
+                    Source: {opportunity.fxSource} • Updated: {new Date(opportunity.fxTimestamp).toLocaleTimeString()}
+                  </div>
                 </div>
               </div>
             </div>

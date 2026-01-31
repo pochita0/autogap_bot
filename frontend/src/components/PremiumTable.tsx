@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { PremiumOpportunity } from '../types/premium';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PremiumTableProps {
   opportunities: PremiumOpportunity[];
   onRowClick: (id: string) => void;
 }
 
+type SortOrder = 'desc' | 'asc';
+
 export default function PremiumTable({ opportunities, onRowClick }: PremiumTableProps) {
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const formatPrice = (price: number) => {
     if (price < 1) return price.toFixed(4);
     if (price < 100) return price.toFixed(2);
@@ -13,30 +18,52 @@ export default function PremiumTable({ opportunities, onRowClick }: PremiumTable
   };
 
   const formatPercent = (pct: number) => {
-    return pct.toFixed(2) + '%';
+    return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
   };
 
   const getGapColor = (pct: number) => {
-    if (pct >= 2) return 'text-green-400';
-    if (pct >= 1) return 'text-green-300';
-    if (pct >= 0.5) return 'text-yellow-300';
+    const absPct = Math.abs(pct);
+    if (absPct >= 2) return pct >= 0 ? 'text-green-400' : 'text-red-400';
+    if (absPct >= 1) return pct >= 0 ? 'text-green-300' : 'text-red-300';
+    if (absPct >= 0.5) return pct >= 0 ? 'text-yellow-300' : 'text-orange-300';
     return 'text-slate-400';
   };
 
-  // Sort by gap % descending
-  const sortedOpportunities = [...opportunities].sort((a, b) => b.gapPct - a.gapPct);
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+  };
+
+  // Sort by absolute gap % based on current sort order
+  const sortedOpportunities = [...opportunities].sort((a, b) => {
+    const diff = Math.abs(b.gapPct) - Math.abs(a.gapPct);
+    return sortOrder === 'desc' ? diff : -diff;
+  });
 
   return (
-    <div className="flex-1 overflow-x-auto scrollbar-thin">
+    <div className="h-full overflow-auto scrollbar-thin">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
+        <thead className="sticky top-0 bg-slate-800 border-b border-slate-700 z-10">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Type</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Symbol</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Direction</th>
             <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">Buy Price (KRW)</th>
             <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">Sell Price (KRW)</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">Gap %</th>
+            <th
+              className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors select-none"
+              onClick={toggleSortOrder}
+              title="Click to toggle sort order"
+            >
+              <div className="flex items-center justify-end gap-1">
+                <span>Gap %</span>
+                {sortOrder === 'desc' ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronUp className="w-4 h-4" />
+                )}
+              </div>
+            </th>
             <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">FX Rate</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Updated</th>
           </tr>

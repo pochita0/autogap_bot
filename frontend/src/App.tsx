@@ -5,15 +5,27 @@ import DetailsModal from './components/DetailsModal';
 import { getOpportunityDetail } from './data/dummyOpportunities';
 import { FilterState, Opportunity } from './types/opportunity';
 import { applyFilters } from './domain/filters';
-import { fetchOpportunities, getCurrentDataSource, setDataSource as setDataSourceStorage, getDataSourceInfo, DataSource, fetchPremiumOpportunities } from './services/api';
-import { RefreshCw, Database, LayoutGrid } from 'lucide-react';
+import { fetchOpportunities, fetchPremiumOpportunities } from './services/api';
+import { RefreshCw, LayoutGrid } from 'lucide-react';
 import PremiumTable from './components/PremiumTable';
 import PremiumDetailsModal from './components/PremiumDetailsModal';
 import { PremiumOpportunity } from './types/premium';
 
 const DEFAULT_FILTERS: FilterState = {
+  // Data Quality Filters (conservative defaults)
+  minVolumeUsd24h: 200000,           // $200k minimum volume
+  excludeIfVolumeMissing: true,      // Exclude missing volume
+  minPriceUsd: 0.01,                 // $0.01 minimum price
+  maxGapPct: 50,                     // 50% max gap
+  maxSpreadPct: 1.0,                 // 1% max spread
+  maxQuoteAgeSeconds: 5,             // 5 second max age
+
+  // Execution Feasibility Filters
+  requireCommonOpenNetwork: true,    // Require common network
+  requireDepositAddress: true,       // Require deposit address
+
+  // Existing Filters
   minGapPct: 0.5,
-  maxGapPct: 100,
   excludeExchanges: [],
   showSpotSpotHedge: true,
   showSpotFutures: true,
@@ -30,21 +42,26 @@ type ViewMode = 'opportunities' | 'premiums';
 function App() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
-  const [dataSource, setDataSourceState] = useState<DataSource>(getCurrentDataSource());
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [premiumOpportunities, setPremiumOpportunities] = useState<PremiumOpportunity[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('opportunities');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<{
+    count: number;
+    total?: number;
+    filteredOut?: number;
+  }>({ count: 0 });
 
-  // Fetch opportunities from backend API
-  const loadOpportunities = async (dataset: DataSource) => {
+  // Fetch opportunities from backend API (live mode only)
+  const loadOpportunities = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchOpportunities(dataset);
+      const { opportunities: data, metadata: meta } = await fetchOpportunities(filters);
       setOpportunities(data);
+      setMetadata(meta);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('Failed to load opportunities:', err);
@@ -70,21 +87,14 @@ function App() {
     }
   };
 
-  // Handle data source switch
-  const handleDataSourceChange = async (newSource: DataSource) => {
-    setDataSourceStorage(newSource);
-    setDataSourceState(newSource);
-    await loadOpportunities(newSource);
-  };
-
-  // Load opportunities on mount
+  // Load opportunities on mount and when filters change
   useEffect(() => {
     if (viewMode === 'opportunities') {
-      loadOpportunities(dataSource);
+      loadOpportunities();
     } else {
       loadPremiumOpportunities();
     }
-  }, []);
+  }, [filters]);
 
   // Load filters from localStorage on mount
   useEffect(() => {
@@ -107,14 +117,14 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (viewMode === 'opportunities') {
-        loadOpportunities(dataSource);
+        loadOpportunities();
       } else {
         loadPremiumOpportunities();
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [dataSource, viewMode]);
+  }, [viewMode]);
 
   // Filter opportunities based on filters
   // In debug mode, show ALL opportunities; otherwise, filter normally
@@ -140,7 +150,7 @@ function App() {
 
   const handleRefresh = () => {
     if (viewMode === 'opportunities') {
-      loadOpportunities(dataSource);
+      loadOpportunities();
     } else {
       loadPremiumOpportunities();
     }
@@ -149,7 +159,7 @@ function App() {
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     if (mode === 'opportunities') {
-      loadOpportunities(dataSource);
+      loadOpportunities();
     } else {
       loadPremiumOpportunities();
     }
@@ -198,52 +208,39 @@ function App() {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right text-sm">
-                <div className="text-slate-400">
-                  {filters.debugMode && viewMode === 'opportunities' ? (
-                    <span className="text-amber-400 font-semibold">🔧 DEBUG MODE</span>
-                  ) : (
-                    'Showing'
-                  )}
-                </div>
-                <div className="text-white font-semibold">
-                  {viewMode === 'opportunities' ? (
-                    filters.debugMode ? (
-                      `All ${opportunities.length} opportunities`
-                    ) : (
-                      `${sortedOpportunities.length} of ${opportunities.length} opportunities`
-                    )
-                  ) : (
-                    `${premiumOpportunities.length} premium opportunities`
-                  )}
-                </div>
+                {viewMode === 'opportunities' ? (
+                  <>
+                    <div className="text-slate-400">
+                      {filters.debugMode ? (
+                        <span className="text-amber-400 font-semibold">🔧 DEBUG MODE (showing all with exclusion reasons)</span>
+                      ) : (
+                        'Showing'
+                      )}
+                    </div>
+                    <div className="text-white font-semibold">
+                      {metadata.total !== undefined ? (
+                        <>
+                          {metadata.count} of {metadata.total} opportunities
+                          {metadata.filteredOut !== undefined && metadata.filteredOut > 0 && !filters.debugMode && (
+                            <span className="text-orange-400 ml-2 text-xs">
+                              (filtered out {metadata.filteredOut})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        `${sortedOpportunities.length} opportunities`
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-slate-400">Showing</div>
+                    <div className="text-white font-semibold">
+                      {premiumOpportunities.length} premium opportunities
+                    </div>
+                  </>
+                )}
               </div>
-
-              {/* Data Source Switcher (only for opportunities view) */}
-              {viewMode === 'opportunities' && (
-                <div className="relative group">
-                  <button
-                    onClick={() => handleDataSourceChange(dataSource === 'dummy' ? 'golden' : 'dummy')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                      dataSource === 'golden'
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                        : 'bg-slate-700 hover:bg-slate-600 text-white'
-                    }`}
-                    title={`Switch to ${dataSource === 'dummy' ? 'Golden Fixtures' : 'Dummy Data'}`}
-                  >
-                    <Database className="w-4 h-4" />
-                    {dataSource === 'golden' ? 'Golden' : 'Dummy'}
-                  </button>
-                  <div className="absolute right-0 mt-2 w-64 bg-slate-700 rounded-lg shadow-xl p-3 text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    <div className="font-semibold text-white mb-1">
-                      {getDataSourceInfo(dataSource).label}
-                    </div>
-                    <div>{getDataSourceInfo(dataSource).description}</div>
-                    <div className="mt-1 text-slate-400">
-                      {opportunities.length} opportunities
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <button
                 onClick={handleRefresh}
@@ -257,15 +254,11 @@ function App() {
           <div className="mt-3 text-xs text-slate-400 flex items-center gap-3">
             <span>Last updated: {lastUpdate.toLocaleTimeString()} • Auto-refresh every 3s</span>
             <span className="text-slate-500">|</span>
-            {viewMode === 'opportunities' ? (
-              <span className={dataSource === 'golden' ? 'text-amber-400 font-semibold' : ''}>
-                Dataset: {getDataSourceInfo(dataSource).label}
-              </span>
-            ) : (
-              <span className="text-emerald-400 font-semibold">
-                Live Premium Data (김프/역프)
-              </span>
-            )}
+            <span className="text-emerald-400 font-semibold">
+              🔴 {viewMode === 'opportunities' ? 'Live Arbitrage Data' : 'Live Premium Data (김프/역프)'}
+            </span>
+            <span className="text-slate-500">|</span>
+            <span className="text-blue-300">FX: Bithumb USDT/KRW</span>
             {isLoading && <span className="text-blue-400">⟳ Loading...</span>}
             {error && <span className="text-red-400">⚠ {error}</span>}
           </div>

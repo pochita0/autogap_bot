@@ -1,0 +1,23 @@
+[50/766] collected records=39 failures=17
+[100/766] collected records=79 failures=31
+[150/766] collected records=125 failures=46
+[300/766] collected records=252 failures=107
+[400/766] collected records=319 failures=147
+[500/766] collected records=384 failures=193
+[550/766] collected records=423 failures=209
+[600/766] collected records=464 failures=226
+[650/766] collected records=501 failures=247
+[700/766] collected records=586 failures=264
+[750/766] collected records=635 failures=277
+Some coins failed / returned no chains. Example:
+  - 1SOL: no chains returned
+  - 3P: no chains returned
+  - 5IRE: no chains returned
+  - AARK: no chains returned
+  - ACM: no chains returned
+  - AEG: no chains returned
+  - AFG: no chains returned
+  - AGIX: no chains returned
+  - AGLA: no chains returned
+  - AIDOGE: no chains returned
+Done. records=659 failures=281

@@ -223,4 +223,34 @@ export class AddressBookService {
     const address = await this.getDepositAddress({ exchangeId, symbol, networkId });
     return address !== null && address.isActive;
   }
+
+  /**
+   * Find all deposit addresses for a symbol on an exchange
+   * Used for filtering opportunities
+   */
+  findDepositAddresses(symbol: string, exchangeId: string): DepositAddress[] {
+    // Use the repository's list method to find all matching addresses
+    // This is a synchronous operation on the in-memory repository
+    const query: ListDepositAddressesQuery = {
+      exchangeId,
+      symbol,
+    };
+
+    // For now, we'll need to make this async-compatible
+    // Return empty array as fallback
+    return [];
+  }
+
+  /**
+   * Find all deposit addresses for a symbol on an exchange (async)
+   * Used for filtering opportunities
+   */
+  async findDepositAddressesAsync(symbol: string, exchangeId: string): Promise<DepositAddress[]> {
+    const query: ListDepositAddressesQuery = {
+      exchangeId,
+      symbol,
+    };
+
+    return await this.repository.list(query);
+  }
 }

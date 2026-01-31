@@ -41,6 +41,20 @@ export interface Opportunity {
     checkedAt?: string;
   };
 
+  // Address check (enriched by backend for deposit address validation)
+  address_check?: {
+    ok: boolean;
+    reasons: string[];
+    matchedNetworkId?: string; // Canonical network ID if address found
+  };
+
+  // Filter exclusions (populated in debug mode)
+  filter_exclusions?: Array<{
+    reason: string;
+    code: string;
+    details?: string;
+  }>;
+
   // Route info (NEW in v0.3)
   routeType: RouteType;
   estTimeMins: number;

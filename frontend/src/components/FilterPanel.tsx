@@ -16,9 +16,181 @@ export default function FilterPanel({ filters, onFiltersChange }: FilterPanelPro
     onFiltersChange({ ...filters, excludeExchanges: newExcludes });
   };
 
+  const volumePresets = [
+    { label: '200k', value: 200000 },
+    { label: '500k', value: 500000 },
+    { label: '1M', value: 1000000 },
+    { label: '5M', value: 5000000 },
+  ];
+
+  const applyPreset = (preset: 'STRICT' | 'NORMAL' | 'LOOSE') => {
+    const presets = {
+      STRICT: {
+        ...filters,
+        minVolumeUsd24h: 200000,
+        excludeIfVolumeMissing: true,
+        minPriceUsd: 0.01,
+        maxGapPct: 50,
+        maxSpreadPct: 1.0,
+        maxQuoteAgeSeconds: 5,
+        requireCommonOpenNetwork: true,
+        requireDepositAddress: true,
+      },
+      NORMAL: {
+        ...filters,
+        minVolumeUsd24h: 200000,
+        excludeIfVolumeMissing: false,
+        minPriceUsd: 0.01,
+        maxGapPct: 50,
+        maxSpreadPct: 2.0,
+        maxQuoteAgeSeconds: 10,
+        requireCommonOpenNetwork: true,
+        requireDepositAddress: false,
+      },
+      LOOSE: {
+        ...filters,
+        minVolumeUsd24h: 0,
+        excludeIfVolumeMissing: false,
+        minPriceUsd: 0.001,
+        maxGapPct: 100,
+        maxSpreadPct: 5.0,
+        maxQuoteAgeSeconds: 20,
+        requireCommonOpenNetwork: false,
+        requireDepositAddress: false,
+      },
+    };
+
+    onFiltersChange(presets[preset]);
+  };
+
   return (
     <div className="w-80 bg-slate-800 border-r border-slate-700 p-6 overflow-y-auto scrollbar-thin">
       <h2 className="text-xl font-bold text-white mb-6">Filters</h2>
+
+      {/* Filter Presets */}
+      <div className="mb-6 p-3 bg-blue-900/20 border border-blue-800/30 rounded">
+        <h3 className="text-xs font-semibold text-blue-300 mb-2">Quick Presets</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={() => applyPreset('STRICT')}
+            className="flex-1 px-2 py-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-800/50 text-red-200 text-xs rounded transition-colors"
+          >
+            STRICT
+          </button>
+          <button
+            onClick={() => applyPreset('NORMAL')}
+            className="flex-1 px-2 py-1.5 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800/50 text-blue-200 text-xs rounded transition-colors"
+          >
+            NORMAL
+          </button>
+          <button
+            onClick={() => applyPreset('LOOSE')}
+            className="flex-1 px-2 py-1.5 bg-green-900/30 hover:bg-green-900/50 border border-green-800/50 text-green-200 text-xs rounded transition-colors"
+          >
+            LOOSE
+          </button>
+        </div>
+      </div>
+
+      {/* Data Quality Filters */}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-slate-300 mb-3">📊 Data Quality</h3>
+
+        {/* Min Volume */}
+        <div className="mb-3">
+          <label className="text-xs text-slate-400">Min 24h Volume (USD)</label>
+          <input
+            type="number"
+            step="100000"
+            value={filters.minVolumeUsd24h}
+            onChange={(e) => onFiltersChange({ ...filters, minVolumeUsd24h: parseFloat(e.target.value) || 0 })}
+            className="w-full mt-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex gap-1 mt-1">
+            {volumePresets.map(preset => (
+              <button
+                key={preset.value}
+                onClick={() => onFiltersChange({ ...filters, minVolumeUsd24h: preset.value })}
+                className="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded transition-colors"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Exclude if Volume Missing */}
+        <label className="flex items-center mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.excludeIfVolumeMissing}
+            onChange={(e) => onFiltersChange({ ...filters, excludeIfVolumeMissing: e.target.checked })}
+            className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
+          />
+          <span className="ml-2 text-sm text-slate-300">Exclude if volume missing</span>
+        </label>
+
+        {/* Min Price */}
+        <div className="mb-3">
+          <label className="text-xs text-slate-400">Min Price (USD)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={filters.minPriceUsd}
+            onChange={(e) => onFiltersChange({ ...filters, minPriceUsd: parseFloat(e.target.value) || 0 })}
+            className="w-full mt-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Max Spread */}
+        <div className="mb-3">
+          <label className="text-xs text-slate-400">Max Spread (%)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={filters.maxSpreadPct}
+            onChange={(e) => onFiltersChange({ ...filters, maxSpreadPct: parseFloat(e.target.value) || 1.0 })}
+            className="w-full mt-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Max Quote Age */}
+        <div className="mb-3">
+          <label className="text-xs text-slate-400">Max Quote Age (seconds)</label>
+          <input
+            type="number"
+            step="1"
+            value={filters.maxQuoteAgeSeconds}
+            onChange={(e) => onFiltersChange({ ...filters, maxQuoteAgeSeconds: parseFloat(e.target.value) || 5 })}
+            className="w-full mt-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Execution Feasibility Filters */}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-slate-300 mb-3">⚙️ Execution Feasibility</h3>
+
+        <label className="flex items-center mb-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.requireCommonOpenNetwork}
+            onChange={(e) => onFiltersChange({ ...filters, requireCommonOpenNetwork: e.target.checked })}
+            className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
+          />
+          <span className="ml-2 text-sm text-slate-300">Require common open network</span>
+        </label>
+
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.requireDepositAddress}
+            onChange={(e) => onFiltersChange({ ...filters, requireDepositAddress: e.target.checked })}
+            className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
+          />
+          <span className="ml-2 text-sm text-slate-300">Require deposit address</span>
+        </label>
+      </div>
 
       {/* Strategy Type */}
       <div className="mb-6">
@@ -163,8 +335,18 @@ export default function FilterPanel({ filters, onFiltersChange }: FilterPanelPro
       {/* Reset Button */}
       <button
         onClick={() => onFiltersChange({
+          // Data Quality Filters
+          minVolumeUsd24h: 200000,
+          excludeIfVolumeMissing: true,
+          minPriceUsd: 0.01,
+          maxGapPct: 50,
+          maxSpreadPct: 1.0,
+          maxQuoteAgeSeconds: 5,
+          // Execution Feasibility Filters
+          requireCommonOpenNetwork: true,
+          requireDepositAddress: true,
+          // Existing Filters
           minGapPct: 0.5,
-          maxGapPct: 100,
           excludeExchanges: [],
           showSpotSpotHedge: true,
           showSpotFutures: true,

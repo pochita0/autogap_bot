@@ -22,7 +22,8 @@ export class KimchiGapCalculator {
     const { type, buyPrice, sellPrice } = opportunity;
 
     // Get current FX rate
-    const fxRate = await this.fxRateService.getUsdtKrwRate();
+    const fxRateData = await this.fxRateService.getUsdtKrwRate();
+    const fxRate = fxRateData.mid;
 
     // Only process Kimchi Premium opportunities
     if (type !== 'KIMP_OVERSEAS_TO_BITHUMB' && type !== 'KIMP_BITHUMB_TO_OVERSEAS') {

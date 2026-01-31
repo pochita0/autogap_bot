@@ -41,6 +41,20 @@ export interface Opportunity {
     checkedAt?: string;
   };
 
+  // Address check (enriched by backend)
+  address_check?: {
+    ok: boolean;
+    reasons: string[];
+    matchedNetworkId?: string;
+  };
+
+  // Filter exclusions (populated in debug mode)
+  filter_exclusions?: Array<{
+    reason: string;
+    code: string;
+    details?: string;
+  }>;
+
   // Route info (NEW in v0.3)
   routeType: RouteType;
   estTimeMins: number;
@@ -125,13 +139,25 @@ export interface RouteStep {
 }
 
 export interface FilterState {
-  minGapPct: number;
+  // Data Quality Filters
+  minVolumeUsd24h: number;
+  excludeIfVolumeMissing: boolean;
+  minPriceUsd: number;
   maxGapPct: number;
+  maxSpreadPct: number;
+  maxQuoteAgeSeconds: number;
+
+  // Execution Feasibility Filters
+  requireCommonOpenNetwork: boolean;
+  requireDepositAddress: boolean;
+
+  // Existing Filters
+  minGapPct: number;
   excludeExchanges: string[];
   showSpotSpotHedge: boolean;
   showSpotFutures: boolean;
-  showKimpOverseasToBithumb: boolean; // NEW: Kimchi Premium filter
-  showKimpBithumbToOverseas: boolean; // NEW: Reverse Kimchi filter
+  showKimpOverseasToBithumb: boolean;
+  showKimpBithumbToOverseas: boolean;
   onlyOpenNetworks: boolean;
   allowBridgeRoutes: boolean;
   minNetProfitPct: number;
