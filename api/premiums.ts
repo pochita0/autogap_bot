@@ -20,10 +20,11 @@ interface Quote {
     market: string;
     bid: number;
     ask: number;
+    volume: number; // 24h Trading Volume (Quote Currency -> converted to KRW approx if needed)
     timestamp: string;
 }
 
-// Premium interface
+// Premium interface with Volume and Networks
 interface Premium {
     id: string;
     kind: 'KIMCHI' | 'REVERSE';
@@ -44,6 +45,8 @@ interface Premium {
     direction: 'GLOBAL_TO_KRW' | 'KRW_TO_GLOBAL';
     updatedAt: string;
     isAliasPair: boolean;
+    volume: number; // Combined 24h volume in KRW
+    commonNetworks?: any[]; // Placeholder for networks
 }
 
 // Generate UUID
@@ -88,6 +91,8 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
             const t = ticker as any;
             const bid = parseFloat(t.closing_price || '0');
             const ask = bid * 1.001;
+            // acc_trade_value_24H is within last 24h in KRW
+            const volume = parseFloat(t.acc_trade_value_24H || '0');
 
             if (bid > 0) {
                 quotes.push({
@@ -96,6 +101,7 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
                     market: `${symbol}/KRW`,
                     bid,
                     ask,
+                    volume,
                     timestamp,
                 });
             }
@@ -144,6 +150,8 @@ async function fetchUpbitQuotes(): Promise<Quote[]> {
                         market: `${symbol}/KRW`,
                         bid: t.trade_price,
                         ask: t.trade_price * 1.001,
+                        // acc_trade_price_24h is 24h accum in KRW
+                        volume: t.acc_trade_price_24h,
                         timestamp,
                     });
                 });
@@ -161,7 +169,7 @@ async function fetchUpbitQuotes(): Promise<Quote[]> {
 // Fetch Binance quotes
 async function fetchBinanceQuotes(): Promise<Quote[]> {
     try {
-        const response = await fetch('https://api.binance.com/api/v3/ticker/bookTicker');
+        const response = await fetch('https://api.binance.com/api/v3/ticker/24hr'); // Use 24hr ticker for volume
         if (!response.ok) return [];
 
         const data: any[] = await response.json();
@@ -177,6 +185,8 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bidPrice),
                     ask: parseFloat(t.askPrice),
+                    // quoteVolume is in USDT
+                    volume: parseFloat(t.quoteVolume),
                     timestamp,
                 };
             })
@@ -207,6 +217,8 @@ async function fetchOKXQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bidPx),
                     ask: parseFloat(t.askPx),
+                    // volCcy24h is 24h volume in quote currency (USDT)
+                    volume: parseFloat(t.volCcy24h),
                     timestamp,
                 };
             })
@@ -238,6 +250,8 @@ async function fetchBybitQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bid1Price),
                     ask: parseFloat(t.ask1Price),
+                    // turnover24h is 24h turnover (trading volume in quote currency - USDT)
+                    volume: parseFloat(t.turnover24h),
                     timestamp,
                 };
             })
@@ -287,6 +301,10 @@ function calculatePremiums(
                 // Calculate premium (KRW Bid vs Global Ask for conservative estimate)
                 const gapPct = ((krwQuote.bid - globalAskKRW) / globalAskKRW) * 100;
 
+                // Combined volume in KRW (Global volume is in USDT, so convert)
+                const globalVolumeKRW = globalQuote.volume * fxRate;
+                const totalVolume = krwQuote.volume + globalVolumeKRW;
+
                 premiums.push({
                     id: generateId(),
                     kind: gapPct >= 0 ? 'KIMCHI' : 'REVERSE',
@@ -307,6 +325,8 @@ function calculatePremiums(
                     direction: gapPct >= 0 ? 'GLOBAL_TO_KRW' : 'KRW_TO_GLOBAL',
                     updatedAt: new Date().toISOString(),
                     isAliasPair: false,
+                    volume: totalVolume,
+                    commonNetworks: [{ network: "Check Exch", status: "Active" }] // Dummy network status
                 });
             }
         }
