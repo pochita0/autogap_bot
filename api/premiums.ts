@@ -61,7 +61,7 @@ async function fetchFxRate(): Promise<number> {
         const response = await fetch('https://api.bithumb.com/public/ticker/USDT_KRW');
         if (!response.ok) return 1450; // Fallback
 
-        const data = await response.json();
+        const data: any = await response.json();
         if (data.status !== '0000') return 1450;
 
         return parseFloat(data.data.closing_price);
@@ -76,7 +76,7 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
         const response = await fetch('https://api.bithumb.com/public/ticker/ALL_KRW');
         if (!response.ok) return [];
 
-        const data = await response.json();
+        const data: any = await response.json();
         if (data.status !== '0000') return [];
 
         const quotes: Quote[] = [];
@@ -167,6 +167,67 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
             })
             .filter((q: Quote) => q.bid > 0 && q.ask > 0);
     } catch {
+        // console.error('Binance fetch failed', error);
+        return [];
+    }
+}
+
+// Fetch OKX quotes
+async function fetchOKXQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+        if (!response.ok) return [];
+
+        const data: any = await response.json();
+        if (data.code !== '0') return [];
+
+        const timestamp = new Date().toISOString();
+
+        return data.data
+            .filter((t: any) => t.instId.endsWith('USDT'))
+            .map((t: any) => {
+                const symbol = t.instId.split('-')[0];
+                return {
+                    exchange: 'OKX',
+                    symbol,
+                    market: `${symbol}/USDT`,
+                    bid: parseFloat(t.bidPx),
+                    ask: parseFloat(t.askPx),
+                    timestamp,
+                };
+            })
+            .filter((q: Quote) => q.bid > 0 && q.ask > 0);
+    } catch {
+        return [];
+    }
+}
+
+// Fetch Bybit quotes
+async function fetchBybitQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+        if (!response.ok) return [];
+
+        const data: any = await response.json();
+        if (data.retCode !== 0) return [];
+
+        const timestamp = new Date().toISOString();
+
+        return data.result.list
+            .filter((t: any) => t.symbol.endsWith('USDT'))
+            .map((t: any) => {
+                const symbol = t.symbol.replace('USDT', '');
+                return {
+                    exchange: 'BYBIT',
+                    symbol,
+                    market: `${symbol}/USDT`,
+                    bid: parseFloat(t.bid1Price),
+                    ask: parseFloat(t.ask1Price),
+                    timestamp,
+                };
+            })
+            .filter((q: Quote) => q.bid > 0 && q.ask > 0);
+    } catch {
         return [];
     }
 }
@@ -207,7 +268,12 @@ function calculatePremiums(
                 const globalBidKRW = globalQuote.bid * fxRate;
                 const globalAskKRW = globalQuote.ask * fxRate;
 
-                // Calculate premium: (KRW price - Global price in KRW) / Global price in KRW
+                // Calculate premium based on direction
+                // Normally Kimchi Premium is (KRW - Global) / Global
+                // We use conservative prices: KRW Bid vs Global Ask (for buying global, selling KRW)
+                // Or KRW Ask vs Global Bid (for buying KRW, selling global)
+
+                // Use mid-price based gap for simple display
                 const gapPct = ((krwQuote.bid - globalAskKRW) / globalAskKRW) * 100;
 
                 premiums.push({
@@ -259,19 +325,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const startTime = Date.now();
 
         // Fetch data in parallel
-        const [fxRate, bithumbQuotes, upbitQuotes, binanceQuotes] = await Promise.all([
+        const [fxRate, bithumbQuotes, upbitQuotes, binanceQuotes, okxQuotes, bybitQuotes] = await Promise.all([
             fetchFxRate(),
             fetchBithumbQuotes(),
             fetchUpbitQuotes(),
             fetchBinanceQuotes(),
+            fetchOKXQuotes(),
+            fetchBybitQuotes(),
         ]);
 
+        const globalQuotes = [...binanceQuotes, ...okxQuotes, ...bybitQuotes];
+
         const fetchDuration = Date.now() - startTime;
-        console.log(`Fetched in ${fetchDuration}ms: FX=${fxRate}, Bithumb=${bithumbQuotes.length}, Upbit=${upbitQuotes.length}, Binance=${binanceQuotes.length}`);
+        console.log(`Fetched in ${fetchDuration}ms: FX=${fxRate}, Bithumb=${bithumbQuotes.length}, Upbit=${upbitQuotes.length}, Binance=${binanceQuotes.length}, OKX=${okxQuotes.length}, Bybit=${bybitQuotes.length}`);
 
         // Combine KRW quotes
         const krwQuotes = [...bithumbQuotes, ...upbitQuotes];
-        const globalQuotes = binanceQuotes;
 
         // Calculate premiums
         let premiums = calculatePremiums(krwQuotes, globalQuotes, fxRate);
