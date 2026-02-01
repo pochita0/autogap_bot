@@ -5,7 +5,8 @@ import { PremiumOpportunity, PremiumOpportunitiesResponse } from '../types/premi
  * API Service for Gap Dashboard Backend
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// In production (Vercel), use relative /api path; in development, use localhost:4000
+export const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
 
 // Live-only mode - no fixtures
 export type DataSource = 'live';
