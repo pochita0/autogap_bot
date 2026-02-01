@@ -34,7 +34,7 @@ export default function OpportunityTable({ opportunities, onRowClick, filters }:
   };
 
   return (
-    <div className="flex-1 overflow-x-auto scrollbar-thin">
+    <div className="h-full overflow-auto scrollbar-thin">
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-slate-800 border-b border-slate-700">
           <tr>
@@ -63,19 +63,18 @@ export default function OpportunityTable({ opportunities, onRowClick, filters }:
             >
               {/* Strategy */}
               <td className="px-4 py-3 whitespace-nowrap">
-                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                  opp.type === 'SPOT_SPOT_HEDGE'
+                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${opp.type === 'SPOT_SPOT_HEDGE'
                     ? 'bg-blue-900/30 text-blue-300'
                     : opp.type === 'SPOT_FUTURES'
-                    ? 'bg-purple-900/30 text-purple-300'
-                    : opp.type === 'KIMP_OVERSEAS_TO_BITHUMB'
-                    ? 'bg-emerald-900/30 text-emerald-300'
-                    : 'bg-amber-900/30 text-amber-300'
-                }`}>
+                      ? 'bg-purple-900/30 text-purple-300'
+                      : opp.type === 'KIMP_OVERSEAS_TO_BITHUMB'
+                        ? 'bg-emerald-900/30 text-emerald-300'
+                        : 'bg-amber-900/30 text-amber-300'
+                  }`}>
                   {opp.type === 'SPOT_SPOT_HEDGE' ? '🔄 Spot+Hedge' :
-                   opp.type === 'SPOT_FUTURES' ? '📊 Spot-Futures' :
-                   opp.type === 'KIMP_OVERSEAS_TO_BITHUMB' ? '🌏→🇰🇷 KIMP' :
-                   '🇰🇷→🌏 REV-KIMP'}
+                    opp.type === 'SPOT_FUTURES' ? '📊 Spot-Futures' :
+                      opp.type === 'KIMP_OVERSEAS_TO_BITHUMB' ? '🌏→🇰🇷 KIMP' :
+                        '🇰🇷→🌏 REV-KIMP'}
                 </span>
               </td>
 
@@ -108,8 +107,8 @@ export default function OpportunityTable({ opportunities, onRowClick, filters }:
                       {opp.quote === 'KRW' && opp.type === 'KIMP_OVERSEAS_TO_BITHUMB'
                         ? `₩${formatPrice(opp.sellPrice!)}`
                         : opp.quote === 'KRW' && opp.type === 'KIMP_BITHUMB_TO_OVERSEAS'
-                        ? `$${formatPrice(opp.sellPrice!)}`
-                        : `$${formatPrice(opp.sellPrice!)}`}
+                          ? `$${formatPrice(opp.sellPrice!)}`
+                          : `$${formatPrice(opp.sellPrice!)}`}
                     </div>
                   </>
                 ) : opp.type === 'SPOT_SPOT_HEDGE' ? (
@@ -143,9 +142,8 @@ export default function OpportunityTable({ opportunities, onRowClick, filters }:
               <td className="px-4 py-3 text-center whitespace-nowrap">
                 {opp.fundingRate !== undefined ? (
                   <div>
-                    <div className={`text-sm font-medium ${
-                      opp.fundingRate < 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
+                    <div className={`text-sm font-medium ${opp.fundingRate < 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
                       {opp.fundingRate < 0 ? <TrendingDown className="inline w-3 h-3" /> : <TrendingUp className="inline w-3 h-3" />}
                       {' '}{formatPercent(opp.fundingRate)}
                     </div>
@@ -177,11 +175,10 @@ export default function OpportunityTable({ opportunities, onRowClick, filters }:
 
               {/* Route */}
               <td className="px-4 py-3 text-center whitespace-nowrap">
-                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                  opp.routeType === 'DIRECT'
+                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${opp.routeType === 'DIRECT'
                     ? 'bg-emerald-900/30 text-emerald-300'
                     : 'bg-amber-900/30 text-amber-300'
-                }`}>
+                  }`}>
                   {opp.routeType}
                 </span>
               </td>
