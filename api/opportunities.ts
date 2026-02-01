@@ -20,6 +20,7 @@ interface Quote {
     market: string;
     bid: number;
     ask: number;
+    volume: number; // Volume in Quote Currency (USDT or KRW)
     timestamp: string;
 }
 
@@ -36,6 +37,11 @@ interface Opportunity {
     grossGapPct: number;
     netProfitPct: number;
     updatedAt: string;
+    volume24hUsd: number; // For UI display
+    walletStatusOk: boolean; // For UI display
+    commonNetworks: number; // For UI display
+    estTimeMins: number; // For UI display
+    routeType: string; // For UI display
 }
 
 // Generate UUID
@@ -70,6 +76,7 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
             const t = ticker as any;
             const bid = parseFloat(t.closing_price || '0');
             const ask = bid * 1.001; // Estimate ask
+            const volume = parseFloat(t.acc_trade_value_24H || '0');
 
             if (bid > 0) {
                 quotes.push({
@@ -78,6 +85,7 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
                     market: `${symbol}/KRW`,
                     bid,
                     ask,
+                    volume,
                     timestamp,
                 });
             }
@@ -124,6 +132,7 @@ async function fetchUpbitQuotes(): Promise<Quote[]> {
                         market: `${symbol}/KRW`,
                         bid: t.trade_price,
                         ask: t.trade_price * 1.001,
+                        volume: t.acc_trade_price_24h,
                         timestamp,
                     });
                 });
@@ -141,7 +150,7 @@ async function fetchUpbitQuotes(): Promise<Quote[]> {
 // Fetch Binance quotes
 async function fetchBinanceQuotes(): Promise<Quote[]> {
     try {
-        const response = await fetch('https://api.binance.com/api/v3/ticker/bookTicker');
+        const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
         if (!response.ok) return [];
 
         const data: any[] = await response.json();
@@ -157,6 +166,7 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bidPrice),
                     ask: parseFloat(t.askPrice),
+                    volume: parseFloat(t.quoteVolume),
                     timestamp,
                 };
             })
@@ -188,6 +198,7 @@ async function fetchOKXQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bidPx),
                     ask: parseFloat(t.askPx),
+                    volume: parseFloat(t.volCcy24h),
                     timestamp,
                 };
             })
@@ -218,6 +229,7 @@ async function fetchBybitQuotes(): Promise<Quote[]> {
                     market: `${symbol}/USDT`,
                     bid: parseFloat(t.bid1Price),
                     ask: parseFloat(t.ask1Price),
+                    volume: parseFloat(t.turnover24h),
                     timestamp,
                 };
             })
@@ -302,12 +314,19 @@ function createOpportunity(
     gapPct: number
 ): Opportunity {
     const marketParts = buyQuote.market.split('/');
+    const quoteCurrency = marketParts[1] || 'USDT';
+
+    // Calculate volume in USD (approx)
+    // If KRW, divide by 1380. If USDT, it's already USD.
+    const volumeUsd = quoteCurrency === 'KRW'
+        ? (buyQuote.volume + sellQuote.volume) / 1380
+        : (buyQuote.volume + sellQuote.volume);
 
     return {
         id: generateId(),
         type: 'SPOT_SPOT_HEDGE',
         base: marketParts[0] || symbol,
-        quote: marketParts[1] || 'USDT',
+        quote: quoteCurrency,
         buyExchange: buyQuote.exchange,
         sellExchange: sellQuote.exchange,
         buyPrice: buyQuote.ask,
@@ -315,6 +334,13 @@ function createOpportunity(
         grossGapPct: parseFloat(gapPct.toFixed(2)),
         netProfitPct: parseFloat(Math.max(0, gapPct - 0.3).toFixed(2)),
         updatedAt: new Date().toISOString(),
+
+        // UI Display Fields
+        volume24hUsd: volumeUsd || 0,
+        walletStatusOk: true, // Mock status
+        commonNetworks: 1,    // Mock networks count
+        estTimeMins: 0,       // Instant
+        routeType: 'DIRECT'   // Simple route
     };
 }
 
