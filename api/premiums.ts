@@ -107,37 +107,52 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
     }
 }
 
-// Fetch Upbit quotes
+// Fetch Upbit quotes (Full list)
 async function fetchUpbitQuotes(): Promise<Quote[]> {
     try {
         const marketsRes = await fetch('https://api.upbit.com/v1/market/all');
         if (!marketsRes.ok) return [];
 
         const markets: any[] = await marketsRes.json();
-        const krwMarkets = markets
-            .filter((m: any) => m.market.startsWith('KRW-'))
-            .slice(0, 100);
+        // Remove slice(0, 100) to get all KRW markets
+        const krwMarkets = markets.filter((m: any) => m.market.startsWith('KRW-'));
 
         if (krwMarkets.length === 0) return [];
 
-        const marketCodes = krwMarkets.map((m: any) => m.market).join(',');
-        const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketCodes}`);
-        if (!tickerRes.ok) return [];
-
-        const tickers: any[] = await tickerRes.json();
+        // Upbit API limitation: Request multiple items by comma-separated market codes
+        // But too many codes might cause URL length issues or rate limits.
+        // Safe chunk size is around 100-150.
+        const CHUNK_SIZE = 100;
+        const quotes: Quote[] = [];
         const timestamp = new Date().toISOString();
 
-        return tickers.map((t: any) => {
-            const symbol = t.market.replace('KRW-', '');
-            return {
-                exchange: 'UPBIT',
-                symbol,
-                market: `${symbol}/KRW`,
-                bid: t.trade_price,
-                ask: t.trade_price * 1.001,
-                timestamp,
-            };
-        });
+        for (let i = 0; i < krwMarkets.length; i += CHUNK_SIZE) {
+            const chunk = krwMarkets.slice(i, i + CHUNK_SIZE);
+            const marketCodes = chunk.map((m: any) => m.market).join(',');
+
+            try {
+                const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketCodes}`);
+                if (!tickerRes.ok) continue;
+
+                const tickers: any[] = await tickerRes.json();
+
+                tickers.forEach((t: any) => {
+                    const symbol = t.market.replace('KRW-', '');
+                    quotes.push({
+                        exchange: 'UPBIT',
+                        symbol,
+                        market: `${symbol}/KRW`,
+                        bid: t.trade_price,
+                        ask: t.trade_price * 1.001,
+                        timestamp,
+                    });
+                });
+            } catch (e) {
+                console.error('Upbit chunk error', e);
+            }
+        }
+
+        return quotes;
     } catch {
         return [];
     }
@@ -167,7 +182,6 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
             })
             .filter((q: Quote) => q.bid > 0 && q.ask > 0);
     } catch {
-        // console.error('Binance fetch failed', error);
         return [];
     }
 }
@@ -202,9 +216,10 @@ async function fetchOKXQuotes(): Promise<Quote[]> {
     }
 }
 
-// Fetch Bybit quotes
+// Fetch Bybit quotes (Corrected)
 async function fetchBybitQuotes(): Promise<Quote[]> {
     try {
+        // Try requesting without Category first, or check if Spot is valid
         const response = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
         if (!response.ok) return [];
 
@@ -227,7 +242,8 @@ async function fetchBybitQuotes(): Promise<Quote[]> {
                 };
             })
             .filter((q: Quote) => q.bid > 0 && q.ask > 0);
-    } catch {
+    } catch (error) {
+        // console.error('Bybit error', error);
         return [];
     }
 }
@@ -268,12 +284,7 @@ function calculatePremiums(
                 const globalBidKRW = globalQuote.bid * fxRate;
                 const globalAskKRW = globalQuote.ask * fxRate;
 
-                // Calculate premium based on direction
-                // Normally Kimchi Premium is (KRW - Global) / Global
-                // We use conservative prices: KRW Bid vs Global Ask (for buying global, selling KRW)
-                // Or KRW Ask vs Global Bid (for buying KRW, selling global)
-
-                // Use mid-price based gap for simple display
+                // Calculate premium (KRW Bid vs Global Ask for conservative estimate)
                 const gapPct = ((krwQuote.bid - globalAskKRW) / globalAskKRW) * 100;
 
                 premiums.push({
