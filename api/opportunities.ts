@@ -89,38 +89,50 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
     }
 }
 
-// Fetch Upbit quotes
+// Fetch Upbit quotes (Full list)
 async function fetchUpbitQuotes(): Promise<Quote[]> {
     try {
-        // First get markets
         const marketsRes = await fetch('https://api.upbit.com/v1/market/all');
         if (!marketsRes.ok) return [];
 
         const markets: any[] = await marketsRes.json();
-        const krwMarkets = markets
-            .filter((m: any) => m.market.startsWith('KRW-'))
-            .slice(0, 100); // Limit to 100 markets
+        // No limit
+        const krwMarkets = markets.filter((m: any) => m.market.startsWith('KRW-'));
 
         if (krwMarkets.length === 0) return [];
 
-        const marketCodes = krwMarkets.map((m: any) => m.market).join(',');
-        const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketCodes}`);
-        if (!tickerRes.ok) return [];
-
-        const tickers: any[] = await tickerRes.json();
+        // Chunk requests
+        const CHUNK_SIZE = 100;
+        const quotes: Quote[] = [];
         const timestamp = new Date().toISOString();
 
-        return tickers.map((t: any) => {
-            const symbol = t.market.replace('KRW-', '');
-            return {
-                exchange: 'UPBIT',
-                symbol,
-                market: `${symbol}/KRW`,
-                bid: t.trade_price,
-                ask: t.trade_price * 1.001,
-                timestamp,
-            };
-        });
+        for (let i = 0; i < krwMarkets.length; i += CHUNK_SIZE) {
+            const chunk = krwMarkets.slice(i, i + CHUNK_SIZE);
+            const marketCodes = chunk.map((m: any) => m.market).join(',');
+
+            try {
+                const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketCodes}`);
+                if (!tickerRes.ok) continue;
+
+                const tickers: any[] = await tickerRes.json();
+
+                tickers.forEach((t: any) => {
+                    const symbol = t.market.replace('KRW-', '');
+                    quotes.push({
+                        exchange: 'UPBIT',
+                        symbol,
+                        market: `${symbol}/KRW`,
+                        bid: t.trade_price,
+                        ask: t.trade_price * 1.001,
+                        timestamp,
+                    });
+                });
+            } catch (e) {
+                console.error('Upbit chunk error', e);
+            }
+        }
+
+        return quotes;
     } catch {
         return [];
     }
@@ -150,6 +162,7 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
             })
             .filter((q: Quote) => q.bid > 0 && q.ask > 0);
     } catch {
+        // console.error('Binance fetch failed', error);
         return [];
     }
 }
