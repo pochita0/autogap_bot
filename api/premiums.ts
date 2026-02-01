@@ -1,17 +1,10 @@
 /**
  * Vercel Serverless Function: Premiums (김프/역프)
  * GET /api/premiums
+ * 
+ * Calculates Kimchi Premium between KRW and USDT exchanges
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { BithumbQuoteConnector } from '../backend/src/connectors/BithumbQuoteConnector';
-import { BinanceQuoteConnector } from '../backend/src/connectors/BinanceQuoteConnector';
-import { OKXQuoteConnector } from '../backend/src/connectors/OKXQuoteConnector';
-import { UpbitQuoteConnector } from '../backend/src/connectors/UpbitQuoteConnector';
-import { BybitQuoteConnector } from '../backend/src/connectors/BybitQuoteConnector';
-import { fxRateService } from '../backend/src/services/FxRateService';
-import { PremiumCalculator } from '../backend/src/services/PremiumCalculator';
-import { Quote } from '../backend/src/connectors/BithumbQuoteConnector';
-import { ExchangeQuote } from '../backend/src/types/premium';
 
 // CORS helper
 function setCorsHeaders(res: VercelResponse) {
@@ -20,25 +13,230 @@ function setCorsHeaders(res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// Convert Quote to ExchangeQuote
-function toExchangeQuote(quote: Quote): ExchangeQuote {
-    return {
-        exchange: quote.exchange,
-        symbol: quote.symbol,
-        market: quote.market,
-        bid: quote.bid,
-        ask: quote.ask,
-        timestamp: quote.timestamp,
-    };
+// Quote interface
+interface Quote {
+    exchange: string;
+    symbol: string;
+    market: string;
+    bid: number;
+    ask: number;
+    timestamp: string;
 }
 
-// Initialize connectors
-const bithumbQuoteConnector = new BithumbQuoteConnector();
-const binanceQuoteConnector = new BinanceQuoteConnector();
-const okxQuoteConnector = new OKXQuoteConnector();
-const upbitQuoteConnector = new UpbitQuoteConnector();
-const bybitQuoteConnector = new BybitQuoteConnector();
-const premiumCalculator = new PremiumCalculator(fxRateService);
+// Premium interface
+interface Premium {
+    id: string;
+    kind: 'KIMCHI' | 'REVERSE';
+    baseSymbol: string;
+    displaySymbol: string;
+    krwSymbol: string;
+    globalSymbol: string;
+    krwExchange: string;
+    globalExchange: string;
+    krwMarket: string;
+    globalMarket: string;
+    krwBid: number;
+    krwAsk: number;
+    globalBidKRW: number;
+    globalAskKRW: number;
+    usdtKrw: number;
+    gapPct: number;
+    direction: 'GLOBAL_TO_KRW' | 'KRW_TO_GLOBAL';
+    updatedAt: string;
+    isAliasPair: boolean;
+}
+
+// Generate UUID
+function generateId(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Fetch FX rate from Bithumb
+async function fetchFxRate(): Promise<number> {
+    try {
+        const response = await fetch('https://api.bithumb.com/public/ticker/USDT_KRW');
+        if (!response.ok) return 1450; // Fallback
+
+        const data = await response.json();
+        if (data.status !== '0000') return 1450;
+
+        return parseFloat(data.data.closing_price);
+    } catch {
+        return 1450; // Fallback
+    }
+}
+
+// Fetch Bithumb quotes
+async function fetchBithumbQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://api.bithumb.com/public/ticker/ALL_KRW');
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        if (data.status !== '0000') return [];
+
+        const quotes: Quote[] = [];
+        const timestamp = new Date().toISOString();
+
+        for (const [symbol, ticker] of Object.entries(data.data)) {
+            if (symbol === 'date' || typeof ticker !== 'object' || ticker === null) continue;
+
+            const t = ticker as any;
+            const bid = parseFloat(t.closing_price || '0');
+            const ask = bid * 1.001;
+
+            if (bid > 0) {
+                quotes.push({
+                    exchange: 'BITHUMB',
+                    symbol,
+                    market: `${symbol}/KRW`,
+                    bid,
+                    ask,
+                    timestamp,
+                });
+            }
+        }
+
+        return quotes;
+    } catch {
+        return [];
+    }
+}
+
+// Fetch Upbit quotes
+async function fetchUpbitQuotes(): Promise<Quote[]> {
+    try {
+        const marketsRes = await fetch('https://api.upbit.com/v1/market/all');
+        if (!marketsRes.ok) return [];
+
+        const markets: any[] = await marketsRes.json();
+        const krwMarkets = markets
+            .filter((m: any) => m.market.startsWith('KRW-'))
+            .slice(0, 100);
+
+        if (krwMarkets.length === 0) return [];
+
+        const marketCodes = krwMarkets.map((m: any) => m.market).join(',');
+        const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketCodes}`);
+        if (!tickerRes.ok) return [];
+
+        const tickers: any[] = await tickerRes.json();
+        const timestamp = new Date().toISOString();
+
+        return tickers.map((t: any) => {
+            const symbol = t.market.replace('KRW-', '');
+            return {
+                exchange: 'UPBIT',
+                symbol,
+                market: `${symbol}/KRW`,
+                bid: t.trade_price,
+                ask: t.trade_price * 1.001,
+                timestamp,
+            };
+        });
+    } catch {
+        return [];
+    }
+}
+
+// Fetch Binance quotes
+async function fetchBinanceQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://api.binance.com/api/v3/ticker/bookTicker');
+        if (!response.ok) return [];
+
+        const data: any[] = await response.json();
+        const timestamp = new Date().toISOString();
+
+        return data
+            .filter((t: any) => t.symbol.endsWith('USDT'))
+            .map((t: any) => {
+                const symbol = t.symbol.replace('USDT', '');
+                return {
+                    exchange: 'BINANCE',
+                    symbol,
+                    market: `${symbol}/USDT`,
+                    bid: parseFloat(t.bidPrice),
+                    ask: parseFloat(t.askPrice),
+                    timestamp,
+                };
+            })
+            .filter((q: Quote) => q.bid > 0 && q.ask > 0);
+    } catch {
+        return [];
+    }
+}
+
+// Calculate premiums
+function calculatePremiums(
+    krwQuotes: Quote[],
+    globalQuotes: Quote[],
+    fxRate: number
+): Premium[] {
+    const premiums: Premium[] = [];
+
+    // Create lookup maps
+    const krwQuoteMap = new Map<string, Quote[]>();
+    for (const q of krwQuotes) {
+        if (!krwQuoteMap.has(q.symbol)) {
+            krwQuoteMap.set(q.symbol, []);
+        }
+        krwQuoteMap.get(q.symbol)!.push(q);
+    }
+
+    const globalQuoteMap = new Map<string, Quote[]>();
+    for (const q of globalQuotes) {
+        if (!globalQuoteMap.has(q.symbol)) {
+            globalQuoteMap.set(q.symbol, []);
+        }
+        globalQuoteMap.get(q.symbol)!.push(q);
+    }
+
+    // Find matching symbols
+    for (const [symbol, krwList] of krwQuoteMap.entries()) {
+        const globalList = globalQuoteMap.get(symbol);
+        if (!globalList) continue;
+
+        for (const krwQuote of krwList) {
+            for (const globalQuote of globalList) {
+                // Convert global price to KRW
+                const globalBidKRW = globalQuote.bid * fxRate;
+                const globalAskKRW = globalQuote.ask * fxRate;
+
+                // Calculate premium: (KRW price - Global price in KRW) / Global price in KRW
+                const gapPct = ((krwQuote.bid - globalAskKRW) / globalAskKRW) * 100;
+
+                premiums.push({
+                    id: generateId(),
+                    kind: gapPct >= 0 ? 'KIMCHI' : 'REVERSE',
+                    baseSymbol: symbol,
+                    displaySymbol: symbol,
+                    krwSymbol: symbol,
+                    globalSymbol: symbol,
+                    krwExchange: krwQuote.exchange,
+                    globalExchange: globalQuote.exchange,
+                    krwMarket: krwQuote.market,
+                    globalMarket: globalQuote.market,
+                    krwBid: krwQuote.bid,
+                    krwAsk: krwQuote.ask,
+                    globalBidKRW,
+                    globalAskKRW,
+                    usdtKrw: fxRate,
+                    gapPct: parseFloat(gapPct.toFixed(2)),
+                    direction: gapPct >= 0 ? 'GLOBAL_TO_KRW' : 'KRW_TO_GLOBAL',
+                    updatedAt: new Date().toISOString(),
+                    isAliasPair: false,
+                });
+            }
+        }
+    }
+
+    return premiums;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     setCorsHeaders(res);
@@ -50,123 +248,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const {
             symbol,
-            krwExchanges: krwExchangesParam,
-            globalExchanges: globalExchangesParam,
             includeNegative: includeNegativeParam,
             limit: limitStr,
-            offset: offsetStr,
         } = req.query;
 
-        // Parse query parameters
         const limit = limitStr ? parseInt(limitStr as string, 10) : 200;
-        const offset = offsetStr ? parseInt(offsetStr as string, 10) : 0;
         const includeNegative = includeNegativeParam !== 'false';
 
-        // Parse exchange filters
-        const requestedKrwExchanges = krwExchangesParam
-            ? (krwExchangesParam as string).split(',').map((e) => e.trim().toUpperCase())
-            : ['BITHUMB', 'UPBIT'];
-
-        const requestedGlobalExchanges = globalExchangesParam
-            ? (globalExchangesParam as string).split(',').map((e) => e.trim().toUpperCase())
-            : ['BINANCE', 'OKX', 'BYBIT'];
-
-        console.log(
-            `Fetching premiums (symbol=${symbol || 'all'}, krwExchanges=${requestedKrwExchanges.join(',')}, globalExchanges=${requestedGlobalExchanges.join(',')})`
-        );
-
+        console.log(`Fetching premiums (symbol=${symbol || 'all'}, limit=${limit})`);
         const startTime = Date.now();
 
-        // Fetch quotes from requested exchanges in parallel
-        const fetchPromises: Promise<Quote[]>[] = [];
-
-        // KRW exchanges
-        if (requestedKrwExchanges.includes('BITHUMB')) {
-            fetchPromises.push(
-                bithumbQuoteConnector.fetchQuotes().catch(() => [])
-            );
-        }
-        if (requestedKrwExchanges.includes('UPBIT')) {
-            fetchPromises.push(
-                upbitQuoteConnector.fetchQuotes().catch(() => [])
-            );
-        }
-
-        // Global exchanges
-        if (requestedGlobalExchanges.includes('BINANCE')) {
-            fetchPromises.push(
-                binanceQuoteConnector.fetchQuotes().catch(() => [])
-            );
-        }
-        if (requestedGlobalExchanges.includes('OKX')) {
-            fetchPromises.push(
-                okxQuoteConnector.fetchQuotes().catch(() => [])
-            );
-        }
-        if (requestedGlobalExchanges.includes('BYBIT')) {
-            fetchPromises.push(
-                bybitQuoteConnector.fetchQuotes().catch(() => [])
-            );
-        }
-
-        const allQuoteArrays = await Promise.all(fetchPromises);
-        const allQuotes = allQuoteArrays.flat();
+        // Fetch data in parallel
+        const [fxRate, bithumbQuotes, upbitQuotes, binanceQuotes] = await Promise.all([
+            fetchFxRate(),
+            fetchBithumbQuotes(),
+            fetchUpbitQuotes(),
+            fetchBinanceQuotes(),
+        ]);
 
         const fetchDuration = Date.now() - startTime;
-        console.log(`Fetched ${allQuotes.length} quotes in ${fetchDuration}ms`);
+        console.log(`Fetched in ${fetchDuration}ms: FX=${fxRate}, Bithumb=${bithumbQuotes.length}, Upbit=${upbitQuotes.length}, Binance=${binanceQuotes.length}`);
 
-        // Convert to ExchangeQuote and separate KRW and global quotes
-        const krwExchangeQuotes: ExchangeQuote[] = allQuotes
-            .filter((q) =>
-                q.market.includes('/KRW') &&
-                requestedKrwExchanges.includes(q.exchange.toUpperCase())
-            )
-            .map(toExchangeQuote);
+        // Combine KRW quotes
+        const krwQuotes = [...bithumbQuotes, ...upbitQuotes];
+        const globalQuotes = binanceQuotes;
 
-        const globalExchangeQuotes: ExchangeQuote[] = allQuotes
-            .filter((q) =>
-                q.market.includes('/USDT') &&
-                requestedGlobalExchanges.includes(q.exchange.toUpperCase())
-            )
-            .map(toExchangeQuote);
-
-        // Calculate premiums using the correct method
-        const result = await premiumCalculator.getPremiumOpportunitiesWithMetadata(
-            krwExchangeQuotes,
-            globalExchangeQuotes,
-            limit
-        );
+        // Calculate premiums
+        let premiums = calculatePremiums(krwQuotes, globalQuotes, fxRate);
 
         // Filter by symbol if specified
-        let filteredData = symbol
-            ? result.data.filter((p) => p.baseSymbol.toUpperCase() === (symbol as string).toUpperCase())
-            : result.data;
+        if (symbol) {
+            premiums = premiums.filter((p) => p.baseSymbol.toUpperCase() === (symbol as string).toUpperCase());
+        }
 
-        // Filter out negative premiums if requested
+        // Filter negative premiums if not included
         if (!includeNegative) {
-            filteredData = filteredData.filter((p) => p.gapPct >= 0);
+            premiums = premiums.filter((p) => p.gapPct >= 0);
         }
 
         // Sort by gap descending
-        filteredData.sort((a, b) => b.gapPct - a.gapPct);
+        premiums.sort((a, b) => b.gapPct - a.gapPct);
 
-        // Apply pagination
-        const paginatedData = filteredData.slice(offset, offset + limit);
+        // Apply limit
+        premiums = premiums.slice(0, limit);
 
         return res.status(200).json({
-            count: paginatedData.length,
-            total: filteredData.length,
-            fxRate: result.fxRate,
-            fxRateBid: result.fxRateBid,
-            fxRateAsk: result.fxRateAsk,
-            fxSource: result.fxSource,
-            fxRateTimestamp: result.fxRateTimestamp,
-            fxStale: result.fxStale,
-            data: paginatedData,
+            count: premiums.length,
+            fxRate,
+            fxRateTimestamp: new Date().toISOString(),
+            data: premiums,
             meta: {
                 fetchDurationMs: fetchDuration,
-                krwExchanges: requestedKrwExchanges,
-                globalExchanges: requestedGlobalExchanges,
+                krwQuoteCount: krwQuotes.length,
+                globalQuoteCount: globalQuotes.length,
             },
         });
     } catch (error) {
