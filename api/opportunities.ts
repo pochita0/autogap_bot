@@ -84,8 +84,7 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
         }
 
         return quotes;
-    } catch (error) {
-        console.error('Bithumb fetch error:', error);
+    } catch {
         return [];
     }
 }
@@ -122,8 +121,7 @@ async function fetchUpbitQuotes(): Promise<Quote[]> {
                 timestamp,
             };
         });
-    } catch (error) {
-        console.error('Upbit fetch error:', error);
+    } catch {
         return [];
     }
 }
@@ -151,8 +149,67 @@ async function fetchBinanceQuotes(): Promise<Quote[]> {
                 };
             })
             .filter((q: Quote) => q.bid > 0 && q.ask > 0);
-    } catch (error) {
-        console.error('Binance fetch error:', error);
+    } catch {
+        return [];
+    }
+}
+
+// Fetch OKX quotes
+async function fetchOKXQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+        if (!response.ok) return [];
+
+        const data: any = await response.json();
+        if (data.code !== '0') return [];
+
+        const timestamp = new Date().toISOString();
+
+        return data.data
+            .filter((t: any) => t.instId.endsWith('USDT'))
+            .map((t: any) => {
+                const symbol = t.instId.split('-')[0];
+                return {
+                    exchange: 'OKX',
+                    symbol,
+                    market: `${symbol}/USDT`,
+                    bid: parseFloat(t.bidPx),
+                    ask: parseFloat(t.askPx),
+                    timestamp,
+                };
+            })
+            .filter((q: Quote) => q.bid > 0 && q.ask > 0);
+    } catch {
+        return [];
+    }
+}
+
+// Fetch Bybit quotes
+async function fetchBybitQuotes(): Promise<Quote[]> {
+    try {
+        const response = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+        if (!response.ok) return [];
+
+        const data: any = await response.json();
+        if (data.retCode !== 0) return [];
+
+        const timestamp = new Date().toISOString();
+
+        return data.result.list
+            .filter((t: any) => t.symbol.endsWith('USDT'))
+            .map((t: any) => {
+                const symbol = t.symbol.replace('USDT', '');
+                return {
+                    exchange: 'BYBIT',
+                    symbol,
+                    market: `${symbol}/USDT`,
+                    bid: parseFloat(t.bid1Price),
+                    ask: parseFloat(t.ask1Price),
+                    timestamp,
+                };
+            })
+            .filter((q: Quote) => q.bid > 0 && q.ask > 0);
+    } catch {
         return [];
     }
 }
@@ -264,19 +321,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const startTime = Date.now();
 
         // Fetch quotes from exchanges in parallel
-        const [bithumbQuotes, upbitQuotes, binanceQuotes] = await Promise.all([
+        const [bithumbQuotes, upbitQuotes, binanceQuotes, okxQuotes, bybitQuotes] = await Promise.all([
             fetchBithumbQuotes(),
             fetchUpbitQuotes(),
             fetchBinanceQuotes(),
+            fetchOKXQuotes(),
+            fetchBybitQuotes(),
         ]);
 
         const fetchDuration = Date.now() - startTime;
         console.log(
-            `Fetched quotes in ${fetchDuration}ms: Bithumb=${bithumbQuotes.length}, Upbit=${upbitQuotes.length}, Binance=${binanceQuotes.length}`
+            `Fetched quotes in ${fetchDuration}ms: Bithumb=${bithumbQuotes.length}, Upbit=${upbitQuotes.length}, Binance=${binanceQuotes.length}, OKX=${okxQuotes.length}, Bybit=${bybitQuotes.length}`
         );
 
         // Combine all quotes
-        const allQuotes: Quote[] = [...bithumbQuotes, ...upbitQuotes, ...binanceQuotes];
+        const allQuotes: Quote[] = [
+            ...bithumbQuotes,
+            ...upbitQuotes,
+            ...binanceQuotes,
+            ...okxQuotes,
+            ...bybitQuotes
+        ];
 
         // Calculate opportunities
         const opportunities = calculateOpportunities(allQuotes, minGapPct, limit);
@@ -294,6 +359,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     bithumb: bithumbQuotes.length,
                     upbit: upbitQuotes.length,
                     binance: binanceQuotes.length,
+                    okx: okxQuotes.length,
+                    bybit: bybitQuotes.length,
                 },
             },
         });
