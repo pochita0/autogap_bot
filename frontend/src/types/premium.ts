@@ -46,6 +46,8 @@ export interface PremiumOpportunity {
   volume: number; // Combined 24h volume in KRW
   krwVolume24hUsd?: number; // Volume of KRW exchange (in USD approx)
   globalVolume24hUsd?: number; // Volume of Global/Counter exchange (in USD approx)
+  krwChangeRate?: number;     // 24h Change Rate of KRW exchange (%)
+  globalChangeRate?: number;  // 24h Change Rate of Global exchange (%)
   commonNetworks?: any[]; // Placeholder for networks
   aliasNote?: string;         // Optional explanation for alias pairs
   volume24hUsd?: number;      // 24h trading volume in USD (legacy)

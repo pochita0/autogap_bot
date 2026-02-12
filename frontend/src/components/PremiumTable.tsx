@@ -91,7 +91,7 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
   // Prioritize positive premiums, then highest absolute value
   const groupedBySymbol = new Map<string, PremiumOpportunity>();
 
-  console.log(`[PremiumTable] Received ${opportunities.length} opportunities`);
+  // console.log(`[PremiumTable] Received ${opportunities.length} opportunities`);
 
   for (const opp of opportunities) {
     const existing = groupedBySymbol.get(opp.displaySymbol);
@@ -116,7 +116,7 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
     }
   }
 
-  console.log(`[PremiumTable] Grouped into ${groupedBySymbol.size} unique symbols`);
+  // console.log(`[PremiumTable] Grouped into ${groupedBySymbol.size} unique symbols`);
 
   // Calculate displayed premium based on UI direction selection
   const getDisplayedPremium = (opp: PremiumOpportunity) => {
@@ -268,25 +268,6 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
               }
             }
 
-            // Debug: Log price data for the first few tokens
-            if (sortedOpportunities.indexOf(opp) < 3) {
-              console.log(`[PremiumTable] ${opp.displaySymbol}:`, {
-                krwBid: opp.krwBid,
-                krwAsk: opp.krwAsk,
-                krwLast: opp.krwLast,
-                krwAvg: (opp.krwBid + opp.krwAsk) / 2,
-                displayedPrice: opp.krwLast || (opp.krwBid + opp.krwAsk) / 2,
-                globalBid: opp.globalBid,
-                globalAsk: opp.globalAsk,
-                globalLast: opp.globalLast,
-                globalBidKRW: opp.globalBidKRW,
-                globalAskKRW: opp.globalAskKRW,
-                globalLastKRW: opp.globalLastKRW,
-                krwExchange: opp.krwExchange,
-                globalExchange: opp.globalExchange,
-              });
-            }
-
             // Calculate 24h volume in KRW
             // For domestic: use properly mapped upbit/bithumb volumes
             // For kimchi: top = domestic exchange, bottom = overseas exchange
@@ -302,9 +283,26 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
               bottomVolume24hKrw = opp.globalVolume24hUsd ? opp.globalVolume24hUsd * opp.usdtKrw : 0;
             }
 
-            // Use placeholders for now as API doesn't return change rate
-            const change1 = 0;
-            const change2 = 0;
+            // Calculate Change Rates
+            let change1 = 0;
+            let change2 = 0;
+
+            if (type === 'domestic') {
+              // opp.krwChangeRate is Upbit, opp.globalChangeRate is Bithumb
+              const upbitChange = opp.krwChangeRate || 0;
+              const bithumbChange = opp.globalChangeRate || 0;
+
+              if (direction === 'upbit-bithumb') {
+                change1 = upbitChange;
+                change2 = bithumbChange;
+              } else {
+                change1 = bithumbChange;
+                change2 = upbitChange;
+              }
+            } else {
+              change1 = opp.krwChangeRate || 0;
+              change2 = opp.globalChangeRate || 0;
+            }
 
             const isExpanded = expandedTokenId === opp.id;
 
@@ -489,11 +487,15 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
                     )}
                   </td>
 
-                  {/* Daily Change - Show placeholder since data is missing */}
+                  {/* Daily Change - Show actual data */}
                   <td className="px-4 py-1.5 text-right whitespace-nowrap">
                     <div className="space-y-0.5">
-                      <div className="text-sm text-slate-500">-</div>
-                      <div className="text-xs text-slate-600">-</div>
+                      <div className={`text-sm ${getChangeColor(change1)}`}>
+                        {formatPercent(change1)}
+                      </div>
+                      <div className={`text-xs ${getChangeColor(change2)}`}>
+                        {formatPercent(change2)}
+                      </div>
                     </div>
                   </td>
 
