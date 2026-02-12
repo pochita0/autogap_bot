@@ -101,7 +101,9 @@ function calculateKimchiPremiums(
                 const globalAskKRW = globalQuote.ask * fxRate;
 
                 // Gap: (KRW - Global) / Global
-                const gapPct = ((krwQuote.bid - globalAskKRW) / globalAskKRW) * 100;
+                // Use Bid vs Bid (or Last vs Last) for standard Kimchi Premium display.
+                // Using Ask(execution price) caused confusion as it includes spread.
+                const gapPct = ((krwQuote.bid - globalBidKRW) / globalBidKRW) * 100;
 
                 const globalVolumeKRW = globalQuote.volume * fxRate;
                 const totalVolume = krwQuote.volume + globalVolumeKRW;
