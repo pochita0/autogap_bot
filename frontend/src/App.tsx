@@ -6,10 +6,13 @@ import { getOpportunityDetail } from './data/dummyOpportunities';
 import { FilterState, Opportunity } from './types/opportunity';
 import { applyFilters } from './domain/filters';
 import { fetchOpportunities, fetchPremiumOpportunities } from './services/api';
-import { RefreshCw, LayoutGrid } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import PremiumTable from './components/PremiumTable';
 import PremiumDetailsModal from './components/PremiumDetailsModal';
 import { PremiumOpportunity } from './types/premium';
+import { Sidebar } from './components/Sidebar';
+import { MarketInfoBar } from './components/MarketInfoBar';
+import ExchangePairSelector from './components/ExchangePairSelector';
 
 const DEFAULT_FILTERS: FilterState = {
   // Data Quality Filters (conservative defaults)
@@ -37,15 +40,22 @@ const DEFAULT_FILTERS: FilterState = {
   debugMode: false,
 };
 
-type ViewMode = 'opportunities' | 'premiums';
+type ViewMode = 'opportunities' | 'kimchi' | 'domestic';
+type DomesticDirection = 'upbit-bithumb' | 'bithumb-upbit';
+type KimchiExchange = 'upbit' | 'bithumb';
+type OverseasExchange = 'binance' | 'okx' | 'bybit';
 
 function App() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [premiumOpportunities, setPremiumOpportunities] = useState<PremiumOpportunity[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('opportunities');
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [kimchiPremiums, setKimchiPremiums] = useState<PremiumOpportunity[]>([]);
+  const [domesticPremiums, setDomesticPremiums] = useState<PremiumOpportunity[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('kimchi');
+  const [domesticDirection, setDomesticDirection] = useState<DomesticDirection>('upbit-bithumb');
+  const [kimchiDomesticExchange, setKimchiDomesticExchange] = useState<KimchiExchange>('upbit');
+  const [kimchiOverseasExchange, setKimchiOverseasExchange] = useState<OverseasExchange>('binance');
+  const [isFirstLoad, setIsFirstLoad] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<{
@@ -54,47 +64,73 @@ function App() {
     filteredOut?: number;
   }>({ count: 0 });
 
-  // Fetch opportunities from backend API (live mode only)
-  const loadOpportunities = async () => {
+  // Fetch opportunities from backend API (silent refresh)
+  const loadOpportunities = async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
       const { opportunities: data, metadata: meta } = await fetchOpportunities(filters);
       setOpportunities(data);
       setMetadata(meta);
-      setLastUpdate(new Date());
     } catch (err) {
       console.error('Failed to load opportunities:', err);
-      setError('Failed to load opportunities. Make sure the backend server is running.');
+      if (!silent) setError('Failed to load opportunities.');
     } finally {
       setIsLoading(false);
+      setIsFirstLoad(false);
     }
   };
 
-  // Fetch premium opportunities from backend API
-  const loadPremiumOpportunities = async () => {
+  // Fetch kimchi premium opportunities (silent refresh)
+  const loadKimchiPremiums = async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
-      const data = await fetchPremiumOpportunities();
-      setPremiumOpportunities(data);
-      setLastUpdate(new Date());
+
+      const krwExchange = kimchiDomesticExchange.toUpperCase();
+      const globalExchange = kimchiOverseasExchange.toUpperCase();
+
+      const data = await fetchPremiumOpportunities('kimchi', undefined, krwExchange, globalExchange);
+      setKimchiPremiums(data);
     } catch (err) {
-      console.error('Failed to load premium opportunities:', err);
-      setError('Failed to load premium opportunities. Make sure the backend server is running.');
+      console.error('Failed to load kimchi premiums:', err);
+      if (!silent) setError('Failed to load kimchi premiums.');
     } finally {
       setIsLoading(false);
+      setIsFirstLoad(false);
     }
   };
+
+  // Fetch domestic premium opportunities (silent refresh)
+  const loadDomesticPremiums = async (silent = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      setError(null);
+      const data = await fetchPremiumOpportunities('domestic');
+      setDomesticPremiums(data);
+    } catch (err) {
+      console.error('Failed to load domestic premiums:', err);
+      if (!silent) setError('Failed to load domestic premiums.');
+    } finally {
+      setIsLoading(false);
+      setIsFirstLoad(false);
+    }
+  };
+
+  // No need to filter kimchi premiums - backend already filters by selected exchanges
+  // Just pass through the data as-is
+  const filteredKimchiPremiums = kimchiPremiums;
 
   // Load opportunities on mount and when filters change
   useEffect(() => {
     if (viewMode === 'opportunities') {
       loadOpportunities();
-    } else {
-      loadPremiumOpportunities();
+    } else if (viewMode === 'kimchi') {
+      loadKimchiPremiums();
+    } else if (viewMode === 'domestic') {
+      loadDomesticPremiums();
     }
-  }, [filters]);
+  }, [filters, viewMode, kimchiDomesticExchange, kimchiOverseasExchange]);
 
   // Load filters from localStorage on mount
   useEffect(() => {
@@ -113,18 +149,20 @@ function App() {
     localStorage.setItem('gap-dashboard-filters', JSON.stringify(filters));
   }, [filters]);
 
-  // Auto-refresh every 3 seconds
+  // Silent background refresh every 2 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (viewMode === 'opportunities') {
-        loadOpportunities();
-      } else {
-        loadPremiumOpportunities();
+        loadOpportunities(true);
+      } else if (viewMode === 'kimchi') {
+        loadKimchiPremiums(true);
+      } else if (viewMode === 'domestic') {
+        loadDomesticPremiums(true);
       }
-    }, 3000);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [viewMode]);
+  }, [viewMode, kimchiDomesticExchange, kimchiOverseasExchange]);
 
   // Filter opportunities based on filters
   // In debug mode, show ALL opportunities; otherwise, filter normally
@@ -151,8 +189,10 @@ function App() {
   const handleRefresh = () => {
     if (viewMode === 'opportunities') {
       loadOpportunities();
-    } else {
-      loadPremiumOpportunities();
+    } else if (viewMode === 'kimchi') {
+      loadKimchiPremiums();
+    } else if (viewMode === 'domestic') {
+      loadDomesticPremiums();
     }
   };
 
@@ -160,51 +200,86 @@ function App() {
     setViewMode(mode);
     if (mode === 'opportunities') {
       loadOpportunities();
-    } else {
-      loadPremiumOpportunities();
+    } else if (mode === 'kimchi') {
+      loadKimchiPremiums();
+    } else if (mode === 'domestic') {
+      loadDomesticPremiums();
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-900">
-      {/* Filter Panel */}
-      <FilterPanel filters={filters} onFiltersChange={setFilters} />
+    <div className="flex h-screen bg-[#0a0e1a]">
+      {/* Sidebar */}
+      <Sidebar viewMode={viewMode} onViewModeChange={handleViewModeChange} />
+
+      {/* Filter Panel - Only show for opportunities view */}
+      {viewMode === 'opportunities' && (
+        <FilterPanel filters={filters} onFiltersChange={setFilters} />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
+        {/* Market Info Bar - Always visible at the very top */}
+        <MarketInfoBar />
+
         {/* Header */}
-        <div className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+        <div className="bg-[#0f1419] border-b border-slate-800 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">Gap Dashboard</h1>
+              <h1 className="text-2xl font-bold text-white">
+                {viewMode === 'kimchi' && '김치 프리미엄'}
+                {viewMode === 'domestic' && '국내 프리미엄'}
+                {viewMode === 'opportunities' && 'Gap Dashboard'}
+              </h1>
               <p className="text-sm text-slate-400 mt-1">
-                Real-time arbitrage opportunities across exchanges
+                {viewMode === 'kimchi' && '국내와 해외의 거래소의 가격차이를 확인하세요.'}
+                {viewMode === 'domestic' && '국내 거래소 간의 가격차이를 확인하세요.'}
+                {viewMode === 'opportunities' && 'Real-time arbitrage opportunities across exchanges'}
               </p>
 
-              {/* View Mode Selector */}
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => handleViewModeChange('opportunities')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'opportunities'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  <LayoutGrid className="w-3 h-3 inline mr-1" />
-                  Arbitrage Opportunities
-                </button>
-                <button
-                  onClick={() => handleViewModeChange('premiums')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'premiums'
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  🇰🇷 Premium Opportunities (김프/역프)
-                </button>
-              </div>
+              {/* 김치 프리미엄 거래소 선택 */}
+              {viewMode === 'kimchi' && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="w-[220px]">
+                    <ExchangePairSelector
+                      label="국내 거래소"
+                      selectedValue={kimchiDomesticExchange}
+                      onChange={(v) => setKimchiDomesticExchange(v as KimchiExchange)}
+                      pairs={[
+                        { value: 'upbit', leftExchange: 'upbit', leftLabel: '업비트 KRW', rightExchange: '', rightLabel: '' },
+                        { value: 'bithumb', leftExchange: 'bithumb', leftLabel: '빗썸 KRW', rightExchange: '', rightLabel: '' },
+                      ]}
+                    />
+                  </div>
+                  <div className="w-[220px]">
+                    <ExchangePairSelector
+                      label="해외 거래소"
+                      selectedValue={kimchiOverseasExchange}
+                      onChange={(v) => setKimchiOverseasExchange(v as OverseasExchange)}
+                      pairs={[
+                        { value: 'binance', leftExchange: 'binance', leftLabel: '바이낸스 USDT', rightExchange: '', rightLabel: '' },
+                        { value: 'okx', leftExchange: 'okx', leftLabel: 'OKX USDT', rightExchange: '', rightLabel: '' },
+                        { value: 'bybit', leftExchange: 'bybit', leftLabel: '바이빗 USDT', rightExchange: '', rightLabel: '' },
+                      ]}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 국내 프리미엄 방향 선택 */}
+              {viewMode === 'domestic' && (
+                <div className="mt-3 w-[340px]">
+                  <ExchangePairSelector
+                    label="비교 거래소"
+                    selectedValue={domesticDirection}
+                    onChange={(v) => setDomesticDirection(v as DomesticDirection)}
+                    pairs={[
+                      { value: 'upbit-bithumb', leftExchange: 'upbit', leftLabel: '업비트 KRW', rightExchange: 'bithumb', rightLabel: '빗썸 KRW' },
+                      { value: 'bithumb-upbit', leftExchange: 'bithumb', leftLabel: '빗썸 KRW', rightExchange: 'upbit', rightLabel: '업비트 KRW' },
+                    ]}
+                  />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right text-sm">
@@ -236,7 +311,7 @@ function App() {
                   <>
                     <div className="text-slate-400">Showing</div>
                     <div className="text-white font-semibold">
-                      {premiumOpportunities.length} premium opportunities
+                      {viewMode === 'kimchi' ? filteredKimchiPremiums.length : domesticPremiums.length} premium opportunities
                     </div>
                   </>
                 )}
@@ -251,17 +326,12 @@ function App() {
               </button>
             </div>
           </div>
-          <div className="mt-3 text-xs text-slate-400 flex items-center gap-3">
-            <span>Last updated: {lastUpdate.toLocaleTimeString()} • Auto-refresh every 3s</span>
-            <span className="text-slate-500">|</span>
-            <span className="text-emerald-400 font-semibold">
-              🔴 {viewMode === 'opportunities' ? 'Live Arbitrage Data' : 'Live Premium Data (김프/역프)'}
-            </span>
-            <span className="text-slate-500">|</span>
-            <span className="text-blue-300">FX: Bithumb USDT/KRW</span>
-            {isLoading && <span className="text-blue-400">⟳ Loading...</span>}
-            {error && <span className="text-red-400">⚠ {error}</span>}
-          </div>
+          {isFirstLoad && isLoading && (
+            <div className="mt-3 text-xs text-blue-400">⟳ 데이터 불러오는 중...</div>
+          )}
+          {error && (
+            <div className="mt-3 text-xs text-red-400">⚠ {error}</div>
+          )}
         </div>
 
         {/* Opportunity Table or Premium Table */}
@@ -272,10 +342,20 @@ function App() {
               onRowClick={setSelectedOppId}
               filters={filters}
             />
+          ) : viewMode === 'kimchi' ? (
+            <PremiumTable
+              opportunities={filteredKimchiPremiums}
+              onRowClick={setSelectedOppId}
+              type="kimchi"
+              kimchiDomesticExchange={kimchiDomesticExchange}
+              kimchiOverseasExchange={kimchiOverseasExchange}
+            />
           ) : (
             <PremiumTable
-              opportunities={premiumOpportunities}
+              opportunities={domesticPremiums}
               onRowClick={setSelectedOppId}
+              type="domestic"
+              direction={domesticDirection}
             />
           )}
         </div>
@@ -290,8 +370,9 @@ function App() {
       )}
 
       {/* Premium Details Modal */}
-      {viewMode === 'premiums' && selectedOppId && (() => {
-        const selectedPremium = premiumOpportunities.find(opp => opp.id === selectedOppId);
+      {(viewMode === 'kimchi' || viewMode === 'domestic') && selectedOppId && (() => {
+        const premiums = viewMode === 'kimchi' ? filteredKimchiPremiums : domesticPremiums;
+        const selectedPremium = premiums.find(opp => opp.id === selectedOppId);
         return selectedPremium ? (
           <PremiumDetailsModal
             opportunity={selectedPremium}
