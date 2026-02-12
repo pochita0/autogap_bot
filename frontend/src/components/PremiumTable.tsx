@@ -54,12 +54,13 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
   };
 
   const formatVolume = (volumeKrw: number) => {
-    // Always display in 억 (100 million) units
     const inEok = volumeKrw / 100_000_000;
 
-    if (inEok >= 10) {
-      return inEok.toFixed(1) + '억';
-    } else if (inEok >= 1) {
+    if (inEok >= 10000) { // 1조 이상
+      return (inEok / 10000).toFixed(2) + '조';
+    } else if (inEok >= 100) {
+      return inEok.toFixed(0) + '억'; // 100억 이상은 소수점 제거
+    } else if (inEok >= 10) {
       return inEok.toFixed(1) + '억';
     } else {
       return inEok.toFixed(2) + '억';
@@ -301,9 +302,9 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
               bottomVolume24hKrw = opp.globalVolume24hUsd ? opp.globalVolume24hUsd * opp.usdtKrw : 0;
             }
 
-            // Random daily change for demo (replace with real data later)
-            const randomChange1 = (Math.random() * 4 - 2);
-            const randomChange2 = (Math.random() * 4 - 2);
+            // Use placeholders for now as API doesn't return change rate
+            const change1 = 0;
+            const change2 = 0;
 
             const isExpanded = expandedTokenId === opp.id;
 
@@ -488,15 +489,11 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
                     )}
                   </td>
 
-                  {/* Daily Change - Show both */}
+                  {/* Daily Change - Show placeholder since data is missing */}
                   <td className="px-4 py-1.5 text-right whitespace-nowrap">
                     <div className="space-y-0.5">
-                      <div className={`text-sm ${getChangeColor(randomChange1)}`}>
-                        {formatPercent(randomChange1)}
-                      </div>
-                      <div className={`text-sm ${getChangeColor(randomChange2)}`}>
-                        {randomChange2 >= 0 ? '+' : ''}{(randomChange2 * ((type === 'kimchi' ? (opp.globalBid + opp.globalAsk) / 2 : upbitPrice) / 100)).toFixed(4)}
-                      </div>
+                      <div className="text-sm text-slate-500">-</div>
+                      <div className="text-xs text-slate-600">-</div>
                     </div>
                   </td>
 
