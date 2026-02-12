@@ -50,14 +50,18 @@ export function ExchangeLogo({ exchange, className = 'w-5 h-5' }: { exchange: st
 function PairDisplay({ pair }: { pair: ExchangePair }) {
   const isSingle = !pair.rightExchange;
   return (
-    <div className="flex items-center gap-2">
-      <ExchangeLogo exchange={pair.leftExchange} />
-      <span className="text-white text-sm font-medium whitespace-nowrap">{pair.leftLabel}</span>
+    <div className="flex items-center">
+      <div className="flex items-center gap-2 w-[120px]">
+        <ExchangeLogo exchange={pair.leftExchange} />
+        <span className="text-white text-sm font-medium whitespace-nowrap">{pair.leftLabel}</span>
+      </div>
       {!isSingle && (
         <>
-          <span className="text-slate-500 text-xs mx-0.5">-</span>
-          <ExchangeLogo exchange={pair.rightExchange} />
-          <span className="text-white text-sm font-medium whitespace-nowrap">{pair.rightLabel}</span>
+          <span className="text-slate-500 text-xs w-4 text-center flex-shrink-0">-</span>
+          <div className="flex items-center gap-2 w-[120px]">
+            <ExchangeLogo exchange={pair.rightExchange} />
+            <span className="text-white text-sm font-medium whitespace-nowrap">{pair.rightLabel}</span>
+          </div>
         </>
       )}
     </div>
@@ -103,8 +107,8 @@ export default function ExchangePairSelector({ pairs, selectedValue, onChange, l
                 setIsOpen(false);
               }}
               className={`flex items-center justify-between w-full px-3 py-2 transition-colors ${pair.value === selectedValue
-                  ? 'bg-slate-700/40'
-                  : 'hover:bg-slate-700/20'
+                ? 'bg-slate-700/40'
+                : 'hover:bg-slate-700/20'
                 }`}
             >
               <PairDisplay pair={pair} />
