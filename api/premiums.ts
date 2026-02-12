@@ -74,15 +74,23 @@ function generateId(): string {
 // Include previous fetch functions here or assume they are unchanged if using diff is smarter, but due to file size limits and ReplaceFileContent behavior, I should include the whole modified section if I'm replacing a large chunk.
 // I will keep fetch functions as is and only replace from calculatePremiums downwards.
 
-// Fetch Fx Rate
+// Fetch FX rate (Standard KRW/USD)
 async function fetchFxRate(): Promise<number> {
     try {
+        // Try Dunamu (Upbit) Forex API
         const response = await fetch('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD');
-        const data = await response.json();
-        return data[0].basePrice;
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data[0] && data[0].basePrice) {
+                return data[0].basePrice;
+            }
+        }
+        throw new Error('Dunamu API failed');
     } catch (error) {
-        console.error('Failed to fetch FX rate:', error);
-        return 1300; // Default or fallback rate
+        console.error('Failed to fetch FX rate, using fallback:', error);
+        // Fallback to a realistic fixed rate (e.g., 1420) to avoid extreme premium distortion
+        // Do NOT use Bithumb USDT price as it includes kimchi premium itself
+        return 1420;
     }
 }
 
@@ -103,9 +111,8 @@ async function fetchBithumbQuotes(): Promise<Quote[]> {
 
             const t = ticker as any;
             const bid = parseFloat(t.closing_price || '0');
-            const ask = bid * 1.001;
+            const ask = bid * 1.001; // Approximate Ask
             const volume = parseFloat(t.acc_trade_value_24H || '0');
-            // Bithumb gives fluctuation rate string "5.21" -> 5.21%
             const changeRate = parseFloat(t['24H_fluctate_rate'] || '0');
 
             if (bid > 0) {
