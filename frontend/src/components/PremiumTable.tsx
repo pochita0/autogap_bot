@@ -32,7 +32,7 @@ export default function PremiumTable({ opportunities, type = 'kimchi', direction
   const [networkStatuses, setNetworkStatuses] = useState<TokenNetworkStatuses>({});
 
   // Price flash animation tracking
-  const prevPricesRef = useRef < Record<string, { top: number; bottom: number }>({});
+  const prevPricesRef = useRef<Record<string, { top: number; bottom: number }>>({});
   const [flashMap, setFlashMap] = useState<Record<string, { top: 'up' | 'down' | null; bottom: 'up' | 'down' | null }>>({});
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
